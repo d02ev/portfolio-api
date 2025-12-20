@@ -8,7 +8,6 @@ using Application.Repositories;
 using Application.Responses;
 using AutoMapper;
 using Domain.Entities;
-using Domain.Enums;
 using Domain.Exceptions;
 using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
@@ -16,7 +15,7 @@ using RazorLight;
 
 namespace Application.Services;
 
-public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
+public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, IAiIntegration aiIntegration,IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
 {
   private readonly IResumeRepository _resumeRepository = resumeRepository;
   private readonly IExperienceRepository _experienceRepository = experienceRepository;
@@ -25,6 +24,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
   private readonly IEducationRepository _educationRepository = educationRepository;
   private readonly IContactRepository _contactRepository = contactRepository;
   private readonly ISupabaseIntegration _supabaseIntegration = supabaseIntegration;
+  private readonly IAiIntegration _aiIntegration = aiIntegration;
   private readonly IGithubIntegration _githubIntegration = githubIntegration;
   private readonly IMemoryCache _cache = cache;
   private readonly IMapper _mapper = mapper;
@@ -89,12 +89,15 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     var resumeData = generateResumeDto.ResumeData;
     var templateId = generateResumeDto.TemplateId;
     var resumeName = generateResumeDto.ResumeName;
+
+    resumeData = await _aiIntegration.OptimiseGenericAsync(resumeData);
+
     var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
     var engine = ConfigureRazorLightEngine();
     var resumeDataHash = CreateResumeDataHash(resumeData);
     var result = await _cache.GetOrCreateAsync($"resume:{resumeDataHash}", async entry =>
     {
-      entry.SetSlidingExpiration(TimeSpan.FromHours(1));
+      entry.SetSlidingExpiration(TimeSpan.FromDays(7));
       return await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
     });
     result = System.Net.WebUtility.HtmlDecode(result);
@@ -106,7 +109,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
 
     await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
 
-    return new CreateResourceResponse<IDictionary<string, long>>("ResumeJobRun", new Dictionary<string, long>
+    return new CreateResourceResponse<IDictionary<string, long>>("JOB_RUN", new Dictionary<string, long>
     {
       ["jobId"] = jobId,
     });

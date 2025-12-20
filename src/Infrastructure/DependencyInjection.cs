@@ -35,6 +35,7 @@ public static class DependencyInjection
       .AddScoped<IAboutRepository, AboutRepository>()
       .AddScoped<IResumeRepository, ResumeRepository>()
       .AddScoped<ISupabaseIntegration, SupabaseIntegration>()
+      .AddScoped<IAiIntegration, AiIntegration>()
       .AddScoped<IGithubIntegration, GithubIntegration>();
 
     return services;

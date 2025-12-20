@@ -21,6 +21,8 @@ builder.Services
     .Configure<CorsSettings>(builder.Configuration.GetSection(SettingSectionNames.CorsSettings))
     .Configure<MongoDbSettings>(builder.Configuration.GetSection(SettingSectionNames.MongoDbSettings))
     .Configure<GithubSettings>(builder.Configuration.GetSection(SettingSectionNames.GithubSettings))
+    .Configure<AiSettings>(builder.Configuration.GetSection(SettingSectionNames.AiSettings))
+    .Configure<TelegramSettings>(builder.Configuration.GetSection(SettingSectionNames.TelegramSettings))
     .Configure<SupabaseSettings>(builder.Configuration.GetSection(SettingSectionNames.SupabaseSettings))
     .AddAuthentication(opts =>
     {
