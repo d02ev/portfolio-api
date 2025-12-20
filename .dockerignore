@@ -1,0 +1,5 @@
+**/appsettings.json
+**/appsettings.Development.json
+**/appsettings.Sample.json
+**/appsettings.*.json
+!**/appsettings.Production.json
