@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebAPI.Controllers;
@@ -9,6 +10,6 @@ public class HealthController : ControllerBase
   [HttpGet]
   public IActionResult GetHealth()
   {
-    return Ok(new { statusCode = 200, responseCode = "HEALTH_CHECK", resourceName = "APP", message = "Server in Healthy." });
+    return Ok(new { statusCode = (int)HttpStatusCode.OK, message = "Server in Healthy.", datetime = DateTime.UtcNow });
   }
 }

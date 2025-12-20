@@ -8,23 +8,19 @@ public class TechStack : BaseEntity
   [BsonRequired]
   public List<string> Languages { get; set; } = [];
 
-  [BsonElement("frameworks")]
+  [BsonElement("frameworksAndPlatforms")]
   [BsonRequired]
-  public List<string> Frameworks { get; set; } = [];
+  public List<string> FrameworksAndPlatforms { get; set; } = [];
 
   [BsonElement("databases")]
   [BsonRequired]
   public List<string> Databases { get; set; } = [];
 
-  [BsonElement("tools")]
+  [BsonElement("cloudAndDevOps")]
   [BsonRequired]
-  public List<string> Tools { get; set; } = [];
+  public List<string> CloudAndDevOps { get; set; } = [];
 
-  [BsonElement("cloud")]
+  [BsonElement("others")]
   [BsonRequired]
-  public List<string> Cloud { get; set; } = [];
-
-  [BsonElement("ai")]
-  [BsonRequired]
-  public List<string> Ai { get; set; } = [];
+  public List<string> Others { get; set; } = [];
 }

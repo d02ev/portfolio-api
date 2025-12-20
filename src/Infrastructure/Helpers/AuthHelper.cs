@@ -81,17 +81,4 @@ public class AuthHelper(IOptions<JwtSettings> options) : IAuthHelper
 
     return new JwtSecurityTokenHandler().WriteToken(token);
   }
-
-  public string GenerateShortLivedAccessToken(IEnumerable<Claim> claims)
-  {
-    var key = Encoding.UTF8.GetBytes(_jwtSettings.AccessTokenSecretKey);
-    var token = new JwtSecurityToken
-    (
-      claims: claims,
-      expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ShortLivedAccessTokenExpiryInMinutes),
-      signingCredentials: new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256)
-    );
-
-    return new JwtSecurityTokenHandler().WriteToken(token);
-  }
 }

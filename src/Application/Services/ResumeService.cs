@@ -16,12 +16,14 @@ using RazorLight;
 
 namespace Application.Services;
 
-public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, ISupabaseIntegration supabaseIntegration, IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
+public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
 {
   private readonly IResumeRepository _resumeRepository = resumeRepository;
   private readonly IExperienceRepository _experienceRepository = experienceRepository;
   private readonly IProjectRepository _projectRepository = projectRepository;
   private readonly ITechStackRepository _techStackRepository = techStackRepository;
+  private readonly IEducationRepository _educationRepository = educationRepository;
+  private readonly IContactRepository _contactRepository = contactRepository;
   private readonly ISupabaseIntegration _supabaseIntegration = supabaseIntegration;
   private readonly IGithubIntegration _githubIntegration = githubIntegration;
   private readonly IMemoryCache _cache = cache;
@@ -49,19 +51,25 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     var experienceTask = _experienceRepository.FetchByIdsAsync(resume.ExperienceIds);
     var projectTask = _projectRepository.FetchByIdsAsync(resume.ProjectIds);
     var techStackTask = _techStackRepository.FetchByIdAsync(resume.TechStackId);
+    var educationTask = _educationRepository.FetchByIdAsync(resume.EducationId);
+    var contactTask = _contactRepository.FetchByIdAsync(resume.ContactId);
 
-    await Task.WhenAll(experienceTask, projectTask, techStackTask);
+    await Task.WhenAll(experienceTask, projectTask, techStackTask, educationTask, contactTask);
 
     var experiences = await experienceTask;
     experiences = [.. experiences.OrderByDescending(e => e.StartDate)];
 
     var projects = await projectTask;
     var techStack = await techStackTask;
+    var education = await educationTask;
+    var contact = await contactTask;
 
     var fetchResumeDto = _mapper.Map<FetchResumeDto>(resume);
     fetchResumeDto.Projects = _mapper.Map<List<FetchProjectDto>>(projects);
     fetchResumeDto.Experience = _mapper.Map<List<FetchExperienceDto>>(experiences);
-    fetchResumeDto.TechStack = GenerateResumeTechStackDto(techStack);
+    fetchResumeDto.TechStack = _mapper.Map<FetchTechStackDto>(techStack);
+    fetchResumeDto.Contact = _mapper.Map<FetchContactDto>(contact);
+    fetchResumeDto.Education = _mapper.Map<FetchEducationDto>(education);
 
     return new FetchResourceResponse<FetchResumeDto>(ResourceNames.Resume, fetchResumeDto);
   }
@@ -74,24 +82,6 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
 
     await _resumeRepository.UpdateAsync(resumeId, serializedChanges);
     return new UpdateResourceResponse<IDictionary<string, object>>(ResourceNames.Resume, changes);
-  }
-
-  private static ResumeTechStackDto GenerateResumeTechStackDto(TechStack techStack)
-  {
-    var techAndTools = new List<string>();
-
-    techAndTools.AddRange(techStack.Frameworks);
-    techAndTools.AddRange(techStack.Databases);
-    techAndTools.AddRange(techStack.Cloud);
-    techAndTools.AddRange(techStack.Ai);
-    techAndTools.AddRange(techStack.Tools);
-
-    return new ResumeTechStackDto
-    {
-      Id = techStack.Id,
-      Languages = techStack.Languages,
-      TechAndTools = techAndTools,
-    };
   }
 
   public async Task<CreateResourceResponse<IDictionary<string, long>>> GenerateResume(GenerateResumeDto generateResumeDto)

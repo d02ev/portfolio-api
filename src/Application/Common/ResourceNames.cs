@@ -16,5 +16,9 @@ public static class ResourceNames
 
   public const string Resume = "RESUME";
 
+  public const string Contact = "CONTACT";
+
+  public const string Education = "EDUCATION";
+
   public const string TechStack = "TECH_STACK";
 }

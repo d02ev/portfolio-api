@@ -13,53 +13,14 @@ public class ResumeDto
   [JsonProperty("techStackId")]
   public string TechStackId { get; set; } = string.Empty;
 
+  [JsonProperty("contactId")]
+  public string ContactId { get; set; } = string.Empty;
+
+  [JsonProperty("educationId")]
+  public string EducationId { get; set; } = string.Empty;
+
   [JsonProperty("name")]
   public string Name { get; set; } = string.Empty;
-
-  [JsonProperty("contact")]
-  public ContactDto Contact { get; set; } = new ContactDto();
-
-  [JsonProperty("education")]
-  public EducationDto Education { get; set; } = new EducationDto();
-}
-
-public class ContactDto
-{
-  [JsonProperty("email")]
-  public string Email { get; set; } = string.Empty;
-
-  [JsonProperty("mobile")]
-  public string Mobile { get; set; } = string.Empty;
-
-  [JsonProperty("github")]
-  public string Github { get; set; } = string.Empty;
-
-  [JsonProperty("linkedin")]
-  public string Linkedin { get; set; } = string.Empty;
-
-  [JsonProperty("website")]
-  public string Website { get; set; } = string.Empty;
-}
-
-public class EducationDto
-{
-  [JsonProperty("institute")]
-  public string Institute { get; set; } = string.Empty;
-
-  [JsonProperty("startDate")]
-  public string StartDate { get; set; } = string.Empty;
-
-  [JsonProperty("endDate")]
-  public string EndDate { get; set; } = string.Empty;
-
-  [JsonProperty("degree")]
-  public string Degree { get; set; } = string.Empty;
-
-  [JsonProperty("grade")]
-  public string Grade { get; set; } = string.Empty;
-
-  [JsonProperty("coursework")]
-  public List<string> Coursework { get; set; } = [];
 }
 
 public class FetchResumeDto
@@ -71,10 +32,10 @@ public class FetchResumeDto
   public string Name { get; set; } = string.Empty;
 
   [JsonProperty("contact")]
-  public ContactDto Contact { get; set; } = new ContactDto();
+  public FetchContactDto Contact { get; set; } = new FetchContactDto();
 
   [JsonProperty("education")]
-  public EducationDto Education { get; set; } = new EducationDto();
+  public FetchEducationDto Education { get; set; } = new FetchEducationDto();
 
   [JsonProperty("experience")]
   public List<FetchExperienceDto> Experience { get; set; } = [];
@@ -83,7 +44,7 @@ public class FetchResumeDto
   public List<FetchProjectDto> Projects { get; set; } = [];
 
   [JsonProperty("techStack")]
-  public ResumeTechStackDto TechStack { get; set; } = new ResumeTechStackDto();
+  public FetchTechStackDto TechStack { get; set; } = new FetchTechStackDto();
 }
 
 public class UpdateResumeDto
@@ -97,65 +58,14 @@ public class UpdateResumeDto
   [JsonProperty("techStackId")]
   public string? TechStackId { get; set; } = null;
 
+  [JsonProperty("contactId")]
+  public string? ContactId { get; set; } = null;
+
+  [JsonProperty("educationId")]
+  public string? Education { get; set; } = null;
+
   [JsonProperty("name")]
   public string? Name { get; set; } = null;
-
-  [JsonProperty("contact")]
-  public UpdateContactDto? Contact { get; set; } = null;
-
-  [JsonProperty("education")]
-  public UpdateEducationDto? Education { get; set; } = null;
-}
-
-public class UpdateContactDto
-{
-  [JsonProperty("email")]
-  public string? Email { get; set; } = null;
-
-  [JsonProperty("mobile")]
-  public string? Mobile { get; set; } = null;
-
-  [JsonProperty("github")]
-  public string? Github { get; set; } = null;
-
-  [JsonProperty("linkedin")]
-  public string? Linkedin { get; set; } = null;
-
-  [JsonProperty("website")]
-  public string? Website { get; set; } = null;
-}
-
-public class UpdateEducationDto
-{
-  [JsonProperty("institute")]
-  public string? Institute { get; set; } = null;
-
-  [JsonProperty("startDate")]
-  public string? StartDate { get; set; } = null;
-
-  [JsonProperty("endDate")]
-  public string? EndDate { get; set; } = null;
-
-  [JsonProperty("degree")]
-  public string? Degree { get; set; } = null;
-
-  [JsonProperty("grade")]
-  public string? Grade { get; set; } = null;
-
-  [JsonProperty("coursework")]
-  public List<string>? Coursework { get; set; } = null;
-}
-
-public class ResumeTechStackDto
-{
-  [JsonProperty("id")]
-  public string Id { get; set; } = string.Empty;
-
-  [JsonProperty("languages")]
-  public List<string> Languages { get; set; } = [];
-
-  [JsonProperty("techAndTools")]
-  public List<string> TechAndTools { get; set; } = [];
 }
 
 public class GenerateResumeDto

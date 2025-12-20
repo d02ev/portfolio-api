@@ -18,8 +18,4 @@ public class User : BaseEntity
   [BsonElement("refreshToken")]
   [BsonRepresentation(BsonType.String)]
   public string? RefreshToken { get; set; } = null;
-
-  [BsonElement("role")]
-  [BsonRepresentation(BsonType.String)]
-  public string Role { get; set; } = "user";
 }

@@ -20,7 +20,6 @@ builder.Services
     .Configure<JwtSettings>(builder.Configuration.GetSection(SettingSectionNames.JwtSettings))
     .Configure<CorsSettings>(builder.Configuration.GetSection(SettingSectionNames.CorsSettings))
     .Configure<MongoDbSettings>(builder.Configuration.GetSection(SettingSectionNames.MongoDbSettings))
-    .Configure<CookieSettings>(builder.Configuration.GetSection(SettingSectionNames.CookieSettings))
     .Configure<GithubSettings>(builder.Configuration.GetSection(SettingSectionNames.GithubSettings))
     .Configure<SupabaseSettings>(builder.Configuration.GetSection(SettingSectionNames.SupabaseSettings))
     .AddAuthentication(opts =>
@@ -28,7 +27,6 @@ builder.Services
         opts.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         opts.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
-    .AddCookie()
     .AddJwtBearer(opts =>
     {
         var jwtSettings = builder.Configuration.GetSection(SettingSectionNames.JwtSettings).Get<JwtSettings>();
@@ -50,7 +48,7 @@ builder.Services
         {
             var corsSettings = builder.Configuration.GetSection(SettingSectionNames.CorsSettings).Get<CorsSettings>();
             policy
-                .WithMethods([.. corsSettings.Methods])
+                .WithMethods([.. corsSettings!.Methods])
                 .AllowAnyOrigin()
                 .AllowAnyHeader();
 
