@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace WebAPI.Controllers;
 
 [ApiController]
-[Authorize(Roles = "admin")]
+[Authorize]
 [Route("api/about")]
 public class AboutController(IAboutService aboutService) : ControllerBase
 {

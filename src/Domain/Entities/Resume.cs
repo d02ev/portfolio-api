@@ -6,12 +6,10 @@ namespace Domain.Entities;
 public class Resume : BaseEntity
 {
   [BsonElement("experienceIds")]
-  [BsonRepresentation(BsonType.Array)]
   [BsonRequired]
   public List<string> ExperienceIds { get; set; } = [];
 
   [BsonElement("projectIds")]
-  [BsonRepresentation(BsonType.Array)]
   [BsonRequired]
   public List<string> ProjectIds { get; set; } = [];
 

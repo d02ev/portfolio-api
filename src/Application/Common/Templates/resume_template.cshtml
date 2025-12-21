@@ -1,0 +1,140 @@
+@model Application.Dto.FetchResumeDto
+@using System.Linq
+@{
+    Layout = null;
+}@Raw(@"\documentclass[a4paper,8pt]{article}
+
+\usepackage{parskip}
+\usepackage{hologo}
+\usepackage{fontspec}
+
+%other packages for formatting
+\RequirePackage{color}
+\RequirePackage{graphicx}
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage[scale=0.9, top=.4in, bottom=.4in]{geometry}
+
+%tabularx environment
+\usepackage{tabularx}
+
+%for lists within experience section
+\usepackage{enumitem}
+
+% centered version of 'X' col. type
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+%to prevent spillover of tabular into next pages
+\usepackage{supertabular}
+\usepackage{tabularx}
+\newlength{\fullcollw}
+\setlength{\fullcollw}{0.42\textwidth}
+
+%custom \section
+\usepackage{titlesec}
+\usepackage{multicol}
+\usepackage{multirow}
+
+%CV Sections inspired by:
+%http://stefano.italians.nl/archives/26
+\titleformat{\section}{\Large\scshape\raggedright}{}{0em}{}[\titlerule]
+\titlespacing{\section}{1pt}{2pt}{2pt}
+
+%for publications
+\usepackage[style=authoryear,sorting=ynt, maxbibnames=2]{biblatex}
+
+%Setup hyperref package, and colours for links
+\usepackage[unicode, draft=false]{hyperref}
+\color[HTML]{110223}%{1C033C}
+\addbibresource{citations.bib}
+\setlength\bibitemsep{1em}
+
+%for social icons
+\usepackage{fontawesome5}
+% \usepackage{times}
+
+% For underline
+\usepackage[normalem]{ulem}
+
+\setmainfont{Arial}  % Set it to whatever you like
+
+\begin{document}
+
+% non-numbered pages
+\pagestyle{empty}
+
+\begin{tabularx}{\linewidth}{@{} C @{}}
+\color[HTML]{1C033C} \Huge{")@Model.Name@Raw(@"} \\[6pt]
+\\
+\textcolor[HTML]{371e77}{\faEnvelope} \href{mailto:")@Model.Contact.Email@Raw(@"}{")@Model.Contact.Email@Raw(@"} $|$
+\textcolor[HTML]{371e77}{{{\faMobile} ")@Model.Contact.Mobile@Raw(@"}}
+
+\textcolor[HTML]{371e77}{\underline{{\raisebox{-0.05\height}{\faGithub} \href{")@Model.Contact.Github@Raw(@"}{github.com/d02ev}}} $|$}
+\textcolor[HTML]{371e77}{\underline{{\raisebox{-0.05\height}{\faLinkedin} \href{")@Model.Contact.Linkedin@Raw(@"}{linkedin.com/in/vikramaditya-pratap-singh}}} $|$}
+\textcolor[HTML]{371e77}{\underline{\raisebox{-0.05\height}{\faBriefcase} \href{")@Model.Contact.Website@Raw(@"}{d02ev}}}
+\end{tabularx}
+
+\section{Skills}
+\color[HTML]{1C033C}\textbf{Languages:} ")@string.Join(", ", Model.TechStack.Languages)@Raw(@"\\[3pt]
+\color[HTML]{1C033C}\textbf{Frameworks \& Platforms:} ")@string.Join(", ", Model.TechStack.FrameworksAndPlatforms)@Raw(@"\\[3pt]
+\color[HTML]{1C033C}\textbf{Databases:} ")@string.Join(", ", Model.TechStack.Databases)@Raw(@"\\[3pt]
+\color[HTML]{1C033C}\textbf{Cloud \& DevOps:} ")@string.Join(", ", Model.TechStack.CloudAndDevOps)@Raw(@"\\[3pt]
+\color[HTML]{1C033C}\textbf{Others:} ")@string.Join(", ", Model.TechStack.Others)@Raw(@"\\[3pt]
+
+%Experience
+\section{Work Experience}")
+@foreach (var exp in Model.Experience)
+{
+@Raw(@"
+\begin{tabularx}{\linewidth}{ @{}l r@{} }
+\textbf{")@exp.CompanyName@Raw(@", ")@exp.Location@Raw(@"} \hfill \color[HTML]{371e77} ")@exp.StartDate@(exp.EndDate != null ? " - " + exp.EndDate : " - Present")@Raw(@" \\[4pt]
+\color[HTML]{371e77}\textbf{\textit{")@exp.JobTitle@Raw(@"}}\ \hfill \color[HTML]{4B28A4} \\[5pt]")
+    if (exp.Description != null && exp.Description.Any())
+    {
+@Raw(@"
+\begin{minipage}[t]{\linewidth}
+    \begin{itemize}[nosep,after=\strut, leftmargin=2em, itemsep=2pt]")
+        foreach (var d in exp.Description)
+        {
+@Raw(@"
+        \item ")@d
+        }
+@Raw(@"
+    \end{itemize}
+\end{minipage}")
+    }
+@Raw(@"
+\end{tabularx}\\[3pt]
+
+")
+}
+
+@Raw(@"
+% Education
+\section{Education}
+\begin{tabularx}{\linewidth}{ @{}l r@{} }
+\color[HTML]{1C033C} \textbf{")@Model.Education.Institute@Raw(@"} & \hfill \color[HTML]{371e77} ")@Model.Education.StartDate@Raw(@" - ")@Model.Education.EndDate@Raw(@" \\
+\color[HTML]{371e77} ")@Model.Education.Degree@Raw(@" & \hfill \color[HTML]{4B28A4} \textit{\textbf{")@Model.Education.Grade@Raw(@"}} \\")
+@if (Model.Education.Coursework != null && Model.Education.Coursework.Any())
+{
+@Raw(@"
+\multicolumn{2}{@{}X@{}}{Relevant Coursework: ")@string.Join(", ", Model.Education.Coursework)@Raw(@"}")
+}
+@Raw(@"
+\end{tabularx}\\[3pt]
+
+% Projects
+\section{Project Work}
+\begin{tabularx}{\linewidth}{ @{}l r@{} }
+\begin{minipage}[t]{\linewidth}
+    \begin{itemize}[nosep,after=\strut, leftmargin=2em, itemsep=2pt]")
+@foreach (var proj in Model.Projects)
+{
+@Raw(@"
+        \item \textbf{")@proj.DisplayName@Raw(@":} ")@proj.LongDescription@(proj.TechStack != null && proj.TechStack.Any() ? " " + string.Join(", ", proj.TechStack) : "")
+}
+@Raw(@"
+    \end{itemize}
+    \end{minipage}
+\end{tabularx}\\[3pt]
+
+\end{document}")

@@ -15,7 +15,7 @@ using RazorLight;
 
 namespace Application.Services;
 
-public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, IAiIntegration aiIntegration,IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
+public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, IAiIntegration aiIntegration, IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
 {
   private readonly IResumeRepository _resumeRepository = resumeRepository;
   private readonly IExperienceRepository _experienceRepository = experienceRepository;
@@ -94,12 +94,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
 
     var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
     var engine = ConfigureRazorLightEngine();
-    var resumeDataHash = CreateResumeDataHash(resumeData);
-    var result = await _cache.GetOrCreateAsync($"resume:{resumeDataHash}", async entry =>
-    {
-      entry.SetSlidingExpiration(TimeSpan.FromDays(7));
-      return await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
-    });
+    var result = await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
     result = System.Net.WebUtility.HtmlDecode(result);
     var pushedFileName = Guid.NewGuid().ToString();
 
