@@ -130,11 +130,28 @@
 @foreach (var proj in Model.Projects)
 {
 @Raw(@"
-        \item \textbf{")@proj.DisplayName@Raw(@":} ")@proj.LongDescription@(proj.TechStack != null && proj.TechStack.Any() ? " " + string.Join(", ", proj.TechStack) : "")
+        \item \textbf{")@proj.DisplayName@Raw(@":}")
+    if (proj.LongDescription != null && proj.LongDescription.Any())
+    {
+@Raw(@"
+            \begin{itemize}[nosep, leftmargin=2em, itemsep=1pt]")
+        foreach (var line in proj.LongDescription)
+        {
+@Raw(@"
+                \item ")@line
+        }
+        if (proj.TechStack != null && proj.TechStack.Any())
+        {
+@Raw(@"
+                \item \textit{Tech:} ")@string.Join(", ", proj.TechStack)
+        }
+@Raw(@"
+            \end{itemize}")
+    }
 }
 @Raw(@"
     \end{itemize}
-    \end{minipage}
+\end{minipage}
 \end{tabularx}\\[3pt]
 
 \end{document}")

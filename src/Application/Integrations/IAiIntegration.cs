@@ -7,5 +7,5 @@ public interface IAiIntegration
 {
   Task<FetchResumeDto> OptimiseGenericAsync(FetchResumeDto resumeData);
 
-  Task<FetchResumeDto> OptimiseForJobAsync(FetchResumeDto resumeData, string jobDescription);
+  Task<FetchResumeDto> OptimiseForJobAsync(FetchResumeDto resumeData, List<FetchProjectDto> projects, string jobDescription);
 }

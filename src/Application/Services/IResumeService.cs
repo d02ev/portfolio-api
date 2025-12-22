@@ -11,7 +11,9 @@ public interface IResumeService
 
   Task<UpdateResourceResponse<IDictionary<string, object>>> UpdateResume(string resumeId, UpdateResumeDto updateResumeDto);
 
-  Task<CreateResourceResponse<IDictionary<string, long>>> GenerateResume(GenerateResumeDto generateResumeDto);
+  Task<CreateResourceResponse<IDictionary<string, string>>> GenerateResume(GenerateResumeDto generateResumeDto);
+
+  Task<CreateResourceResponse<IDictionary<string, string>>> GenerateResumeForJob(GenerateResumeForJobDto generateResumeForJobDto);
 
   Task<ResumeJobRunResponse> FetchResumeJobRunStatus(long jobId);
 

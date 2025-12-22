@@ -62,7 +62,7 @@ public class UpdateResumeDto
   public string? ContactId { get; set; } = null;
 
   [JsonProperty("educationId")]
-  public string? Education { get; set; } = null;
+  public string? EducationId { get; set; } = null;
 
   [JsonProperty("name")]
   public string? Name { get; set; } = null;
@@ -78,4 +78,19 @@ public class GenerateResumeDto
 
   [JsonProperty("resumeName")]
   public string ResumeName { get; set; } = string.Empty;
+}
+
+public class GenerateResumeForJobDto
+{
+  [JsonProperty("resumeData")]
+  public FetchResumeDto ResumeData { get; set; } = new();
+
+  [JsonProperty("templateId")]
+  public string TemplateId { get; set; } = string.Empty;
+
+  [JsonProperty("resumeName")]
+  public string ResumeName { get; set; } = string.Empty;
+
+  [JsonProperty("jobDescription")]
+  public string JobDescription { get; set; } = string.Empty;
 }

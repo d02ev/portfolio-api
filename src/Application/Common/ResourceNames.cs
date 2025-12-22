@@ -21,4 +21,6 @@ public static class ResourceNames
   public const string Education = "EDUCATION";
 
   public const string TechStack = "TECH_STACK";
+
+  public const string JobRun = "JOB_RUN";
 }
