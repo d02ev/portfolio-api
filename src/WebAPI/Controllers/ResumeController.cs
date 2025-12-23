@@ -33,11 +33,18 @@ public class ResumeController(IResumeService resumeService) : ControllerBase
     return Ok(result);
   }
 
-  [HttpPost("generate")]
-  public async Task<IActionResult> Generate([FromBody] GenerateResumeDto generateResumeDto)
+  [HttpPost("generate/generic")]
+  public async Task<IActionResult> GenerateGeneric([FromBody] GenerateResumeDto generateResumeDto)
   {
     var result = await _resumeService.GenerateResume(generateResumeDto);
-    return CreatedAtAction(nameof(Generate), result);
+    return CreatedAtAction(nameof(GenerateGeneric), result);
+  }
+
+  [HttpPost("generate/jd")]
+  public async Task<IActionResult> GenerateForJob([FromForm] GenerateResumeForJobDto generateResumeForJobDto)
+  {
+    var result = await _resumeService.GenerateResumeForJob(generateResumeForJobDto);
+    return CreatedAtAction(nameof(GenerateForJob), result);
   }
 
   [HttpGet("status/{jobId}")]

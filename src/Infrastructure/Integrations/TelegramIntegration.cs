@@ -12,17 +12,17 @@ public class TelegramIntegration(IOptions<TelegramSettings> options) : ITelegram
   private readonly TelegramSettings _telegramSettings = options.Value;
   private readonly TelegramBotClient _botClient = new(options.Value.BotToken);
 
-  public async Task SendSuccessMessageAsync(string pdfUrl, string mode = ResumeModes.Generic)
+  public async Task SendSuccessMessageAsync(string pdfUrl, string? companyName = null, string mode = ResumeModes.Generic)
   {
     var message = @"
     Resume generation successful!
 
     Mode: " + mode + @"
     Date Time (UTC): " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + @"
+    Company Name: " + companyName is not null ? companyName : "NA" + @"
     PDF_URL: " + pdfUrl + @"
-
     ";
-    await SendMessageAsync(message);
+    await SendMessageAsync(message!);
   }
 
   public async Task SendFailureMessageAsync(string errorMessage, string mode = ResumeModes.Generic)

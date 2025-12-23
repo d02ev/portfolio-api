@@ -9,6 +9,7 @@ using Application.Responses;
 using AutoMapper;
 using Domain.Entities;
 using Domain.Exceptions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
 using RazorLight;
@@ -146,10 +147,11 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
 
   public async Task<CreateResourceResponse<IDictionary<string, string>>> GenerateResumeForJob(GenerateResumeForJobDto generateResumeForJobDto)
   {
-    var resumeData = generateResumeForJobDto.ResumeData;
+    var resumeData = ParseResumeDataJsonString(generateResumeForJobDto.ResumeData);
     var templateId = generateResumeForJobDto.TemplateId;
     var resumeName = generateResumeForJobDto.ResumeName;
-    var jobDescription = generateResumeForJobDto.JobDescription;
+    var jobDescription = ReadJobDescription(generateResumeForJobDto.JobDescription);
+    var companyName = generateResumeForJobDto.CompanyName;
     var projects = await _projectRepository.FetchAllAsync();
     var fetchProjectDtos = _mapper.Map<List<FetchProjectDto>>(projects);
 
@@ -161,7 +163,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     result = System.Net.WebUtility.HtmlDecode(result);
     var pushedFileName = $"jd-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
 
-    await _githubIntegration.PushToRepositoryAsync($"docs/jd_{pushedFileName}_{DateTime.UtcNow}.tex", result!);
+    await _githubIntegration.PushToRepositoryAsync($"docs/{pushedFileName}.tex", result!);
 
     var jobId = await _supabaseIntegration.InsertJobStatusAsync();
 
@@ -175,7 +177,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
       throw new InternalServerException(ResourceNames.JobRun, error);
     }
 
-    await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, ResumeModes.JobDescription);
+    await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, companyName, ResumeModes.JobDescription);
     return new CreateResourceResponse<IDictionary<string, string>>(ResourceNames.Resume, new Dictionary<string, string>
     {
       ["mode"] = ResumeModes.JobDescription,
@@ -190,6 +192,17 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
       .UseEmbeddedResourcesProject(typeof(ResumeService))
       .SetOperatingAssembly(typeof(ResumeService).Assembly)
       .Build();
+  }
+
+  private string ReadJobDescription(IFormFile jobDescriptionFile)
+  {
+    using var reader = new StreamReader(jobDescriptionFile.OpenReadStream());
+    return reader.ReadToEnd();
+  }
+
+  private FetchResumeDto ParseResumeDataJsonString(string resumeDataJsonString)
+  {
+    return JsonConvert.DeserializeObject<FetchResumeDto>(resumeDataJsonString) ?? new FetchResumeDto();
   }
 
   private async Task<(string? error, string? pdfUrl)> PollForJobStatus(long jobId)

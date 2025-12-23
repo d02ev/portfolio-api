@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 
 namespace Application.Dto;
@@ -83,7 +84,7 @@ public class GenerateResumeDto
 public class GenerateResumeForJobDto
 {
   [JsonProperty("resumeData")]
-  public FetchResumeDto ResumeData { get; set; } = new();
+  public string ResumeData { get; set; } = string.Empty;
 
   [JsonProperty("templateId")]
   public string TemplateId { get; set; } = string.Empty;
@@ -91,6 +92,9 @@ public class GenerateResumeForJobDto
   [JsonProperty("resumeName")]
   public string ResumeName { get; set; } = string.Empty;
 
+  [JsonProperty("companyName")]
+  public string CompanyName { get; set; } = string.Empty;
+
   [JsonProperty("jobDescription")]
-  public string JobDescription { get; set; } = string.Empty;
+  public IFormFile JobDescription { get; set; }
 }
