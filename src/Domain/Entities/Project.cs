@@ -14,8 +14,7 @@ public class Project : BaseEntity
   public string ShortDescription { get; set; } = string.Empty;
 
   [BsonElement("longDescription")]
-  [BsonRepresentation(BsonType.String)]
-  public string? LongDescription { get; set; } = null;
+  public List<string> LongDescription { get; set; } = [];
 
   [BsonElement("techStack")]
   public List<string> TechStack { get; set; } = [];

@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace WebAPI.Controllers;
 
 [ApiController]
-[Authorize(Roles = "admin")]
+[Authorize]
 [Route("api/experience")]
 public class ExperienceController(IExperienceService experienceService) : ControllerBase
 {

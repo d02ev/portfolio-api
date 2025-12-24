@@ -15,20 +15,6 @@ public class UserService(IUserRepository userRepository, IAuthHelper authHelper)
   private readonly IUserRepository _userRepository = userRepository;
   private readonly IAuthHelper _authHelper = authHelper;
 
-  public async Task<ShortLivedTokenResponse> GenerateShortLivedToken(string username)
-  {
-    var userExists = await _userRepository.FetchByUsernameAsync(username) ?? throw new NotFoundException(ResourceNames.User, username);
-    var userId = userExists.Id;
-    var claims = new List<Claim>
-    {
-      new(ClaimTypes.NameIdentifier, userId),
-      new(ClaimTypes.Role, userExists.Role)
-    };
-    var shortLivedToken = _authHelper.GenerateShortLivedAccessToken(claims.AsEnumerable());
-
-    return new ShortLivedTokenResponse(shortLivedToken);
-  }
-
   public async Task<LoginUserResponse> LoginUser(UserDto userDto)
   {
     var username = userDto.Username;
@@ -45,7 +31,6 @@ public class UserService(IUserRepository userRepository, IAuthHelper authHelper)
     var accessTokenClaims = new List<Claim>
     {
       new(ClaimTypes.NameIdentifier, userExists.Id),
-      new(ClaimTypes.Role, userExists.Role),
     };
     var refreshTokenClaims = new List<Claim>
     {
@@ -68,7 +53,6 @@ public class UserService(IUserRepository userRepository, IAuthHelper authHelper)
     var accessTokenClaims = new List<Claim>
     {
       new(ClaimTypes.NameIdentifier, userId),
-      new(ClaimTypes.Role, user.Role)
     };
     var accessToken = _authHelper.GenerateAccessToken(accessTokenClaims.AsEnumerable());
 
@@ -88,7 +72,6 @@ public class UserService(IUserRepository userRepository, IAuthHelper authHelper)
     {
       Username = userDto.Username,
       PasswordHash = passwordHash,
-      Role = userDto.Username == "vikramaditya" ? "admin" : "user"
     };
 
     await _userRepository.CreateAsync(user);

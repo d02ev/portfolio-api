@@ -32,7 +32,7 @@ public class MappingProfile : Profile
         opts.MapFrom(_ => DateHelper.ConvertDateToMonthYearString((DateTime)_.EndDate!));
       });
     CreateMap<UpdateExperienceDto, Experience>()
-      .ForMember(e => e.StartDate, opts => 
+      .ForMember(e => e.StartDate, opts =>
       {
         opts.PreCondition(e => !string.IsNullOrEmpty(e.StartDate));
         opts.MapFrom(_ => DateHelper.ConvertMonthYearStringToDate(_.StartDate));
@@ -61,12 +61,20 @@ public class MappingProfile : Profile
     CreateMap<TechStack, FetchTechStackDto>();
     #endregion
 
-    #region Resume
-    CreateMap<Resume, ResumeDto>()
-      .ReverseMap();
+    #region Contact
     CreateMap<Contact, ContactDto>()
       .ReverseMap();
+    CreateMap<Contact, FetchContactDto>();
+    #endregion
+
+    #region Education
     CreateMap<Education, EducationDto>()
+      .ReverseMap();
+    CreateMap<Education, FetchEducationDto>();
+    #endregion
+
+    #region Resume
+    CreateMap<Resume, ResumeDto>()
       .ReverseMap();
     CreateMap<Resume, FetchResumeDto>();
     #endregion

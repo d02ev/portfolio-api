@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace WebAPI.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/techstack")]
 public class TechStackController(ITechStackService techStackService) : ControllerBase
 {
   private readonly ITechStackService _techStackService = techStackService;
 
-  [Authorize(Roles = "admin")]
   [HttpPost]
   public async Task<IActionResult> Create([FromBody] TechStackDto techStackDto)
   {
@@ -19,7 +19,6 @@ public class TechStackController(ITechStackService techStackService) : Controlle
     return CreatedAtAction(nameof(Create), result);
   }
 
-  [Authorize(Roles = "admin")]
   [HttpGet]
   public async Task<IActionResult> GetAll()
   {
@@ -27,7 +26,6 @@ public class TechStackController(ITechStackService techStackService) : Controlle
     return Ok(result);
   }
 
-  [Authorize(Roles = "admin")]
   [HttpPatch("update/{id}")]
   public async Task<IActionResult> Update([FromRoute] string id, [FromBody] UpdateTechStackDto updateTechStackDto)
   {

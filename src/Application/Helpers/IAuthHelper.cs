@@ -10,8 +10,6 @@ public interface IAuthHelper
 
   string GenerateAccessToken(IEnumerable<Claim> claims);
 
-  string GenerateShortLivedAccessToken(IEnumerable<Claim> claims);
-
   string GenerateRefreshToken(IEnumerable<Claim> claims);
 
   ClaimsPrincipal? DecodeToken(string token, string tokenType = "access");

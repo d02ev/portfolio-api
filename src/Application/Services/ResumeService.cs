@@ -8,21 +8,25 @@ using Application.Repositories;
 using Application.Responses;
 using AutoMapper;
 using Domain.Entities;
-using Domain.Enums;
 using Domain.Exceptions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
 using RazorLight;
 
 namespace Application.Services;
 
-public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, ISupabaseIntegration supabaseIntegration, IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
+public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration,IAiIntegration aiIntegration, IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
 {
   private readonly IResumeRepository _resumeRepository = resumeRepository;
   private readonly IExperienceRepository _experienceRepository = experienceRepository;
   private readonly IProjectRepository _projectRepository = projectRepository;
   private readonly ITechStackRepository _techStackRepository = techStackRepository;
+  private readonly IEducationRepository _educationRepository = educationRepository;
+  private readonly IContactRepository _contactRepository = contactRepository;
   private readonly ISupabaseIntegration _supabaseIntegration = supabaseIntegration;
+  private readonly ITelegramIntegration _telegramIntegration = telegramIntegration;
+  private readonly IAiIntegration _aiIntegration = aiIntegration;
   private readonly IGithubIntegration _githubIntegration = githubIntegration;
   private readonly IMemoryCache _cache = cache;
   private readonly IMapper _mapper = mapper;
@@ -49,19 +53,25 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     var experienceTask = _experienceRepository.FetchByIdsAsync(resume.ExperienceIds);
     var projectTask = _projectRepository.FetchByIdsAsync(resume.ProjectIds);
     var techStackTask = _techStackRepository.FetchByIdAsync(resume.TechStackId);
+    var educationTask = _educationRepository.FetchByIdAsync(resume.EducationId);
+    var contactTask = _contactRepository.FetchByIdAsync(resume.ContactId);
 
-    await Task.WhenAll(experienceTask, projectTask, techStackTask);
+    await Task.WhenAll(experienceTask, projectTask, techStackTask, educationTask, contactTask);
 
     var experiences = await experienceTask;
     experiences = [.. experiences.OrderByDescending(e => e.StartDate)];
 
     var projects = await projectTask;
     var techStack = await techStackTask;
+    var education = await educationTask;
+    var contact = await contactTask;
 
     var fetchResumeDto = _mapper.Map<FetchResumeDto>(resume);
     fetchResumeDto.Projects = _mapper.Map<List<FetchProjectDto>>(projects);
     fetchResumeDto.Experience = _mapper.Map<List<FetchExperienceDto>>(experiences);
-    fetchResumeDto.TechStack = GenerateResumeTechStackDto(techStack);
+    fetchResumeDto.TechStack = _mapper.Map<FetchTechStackDto>(techStack);
+    fetchResumeDto.Contact = _mapper.Map<FetchContactDto>(contact);
+    fetchResumeDto.Education = _mapper.Map<FetchEducationDto>(education);
 
     return new FetchResourceResponse<FetchResumeDto>(ResourceNames.Resume, fetchResumeDto);
   }
@@ -69,46 +79,26 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
   public async Task<UpdateResourceResponse<IDictionary<string, object>>> UpdateResume(string resumeId, UpdateResumeDto updateResumeDto)
   {
     var _ = await _resumeRepository.FetchByIdAsync(resumeId) ?? throw new NotFoundException(ResourceNames.Resume, resumeId);
-    var changes = UpdateObjectBuilderHelper.BuildUpdateObject(updateResumeDto);
+    var changes = UpdateObjectBuilderHelper.BuildUpdateObject<UpdateResumeDto>(updateResumeDto);
     var serializedChanges = JsonConvert.SerializeObject(changes);
 
     await _resumeRepository.UpdateAsync(resumeId, serializedChanges);
     return new UpdateResourceResponse<IDictionary<string, object>>(ResourceNames.Resume, changes);
   }
 
-  private static ResumeTechStackDto GenerateResumeTechStackDto(TechStack techStack)
-  {
-    var techAndTools = new List<string>();
-
-    techAndTools.AddRange(techStack.Frameworks);
-    techAndTools.AddRange(techStack.Databases);
-    techAndTools.AddRange(techStack.Cloud);
-    techAndTools.AddRange(techStack.Ai);
-    techAndTools.AddRange(techStack.Tools);
-
-    return new ResumeTechStackDto
-    {
-      Id = techStack.Id,
-      Languages = techStack.Languages,
-      TechAndTools = techAndTools,
-    };
-  }
-
-  public async Task<CreateResourceResponse<IDictionary<string, long>>> GenerateResume(GenerateResumeDto generateResumeDto)
+  public async Task<CreateResourceResponse<IDictionary<string, string>>> GenerateResume(GenerateResumeDto generateResumeDto)
   {
     var resumeData = generateResumeDto.ResumeData;
     var templateId = generateResumeDto.TemplateId;
     var resumeName = generateResumeDto.ResumeName;
+
+    resumeData = await _aiIntegration.OptimiseGenericAsync(resumeData);
+
     var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
     var engine = ConfigureRazorLightEngine();
-    var resumeDataHash = CreateResumeDataHash(resumeData);
-    var result = await _cache.GetOrCreateAsync($"resume:{resumeDataHash}", async entry =>
-    {
-      entry.SetSlidingExpiration(TimeSpan.FromHours(1));
-      return await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
-    });
+    var result = await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
     result = System.Net.WebUtility.HtmlDecode(result);
-    var pushedFileName = Guid.NewGuid().ToString();
+    var pushedFileName = $"ge-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
 
     await _githubIntegration.PushToRepositoryAsync($"docs/{pushedFileName}.tex", result!);
 
@@ -116,9 +106,22 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
 
     await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
 
-    return new CreateResourceResponse<IDictionary<string, long>>("ResumeJobRun", new Dictionary<string, long>
+    await _telegramIntegration.SendWorkflowStartedMessageAsync();
+
+    var (error, pdfUrl) = await PollForJobStatus(jobId);
+    if (error is not null)
     {
-      ["jobId"] = jobId,
+      await _telegramIntegration.SendFailureMessageAsync(error, ResumeModes.Generic);
+      throw new InternalServerException(ResourceNames.JobRun, error);
+    }
+
+    await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, ResumeModes.Generic);
+
+    return new CreateResourceResponse<IDictionary<string, string>>(ResourceNames.Resume, new Dictionary<string, string>
+    {
+      ["mode"] = ResumeModes.Generic,
+      ["resumeName"] = resumeName,
+      ["pdfUrl"] = pdfUrl!,
     });
   }
 
@@ -142,6 +145,47 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     });
   }
 
+  public async Task<CreateResourceResponse<IDictionary<string, string>>> GenerateResumeForJob(GenerateResumeForJobDto generateResumeForJobDto)
+  {
+    var resumeData = ParseResumeDataJsonString(generateResumeForJobDto.ResumeData);
+    var templateId = generateResumeForJobDto.TemplateId;
+    var resumeName = generateResumeForJobDto.ResumeName;
+    var jobDescription = ReadJobDescription(generateResumeForJobDto.JobDescription);
+    var companyName = generateResumeForJobDto.CompanyName;
+    var projects = await _projectRepository.FetchAllAsync();
+    var fetchProjectDtos = _mapper.Map<List<FetchProjectDto>>(projects);
+
+    resumeData = await _aiIntegration.OptimiseForJobAsync(resumeData, fetchProjectDtos, jobDescription);
+
+    var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
+    var engine = ConfigureRazorLightEngine();
+    var result = await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
+    result = System.Net.WebUtility.HtmlDecode(result);
+    var pushedFileName = $"jd-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
+
+    await _githubIntegration.PushToRepositoryAsync($"docs/{pushedFileName}.tex", result!);
+
+    var jobId = await _supabaseIntegration.InsertJobStatusAsync();
+
+    await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
+    await _telegramIntegration.SendWorkflowStartedMessageAsync();
+
+    var (error, pdfUrl) = await PollForJobStatus(jobId);
+    if (error is not null)
+    {
+      await _telegramIntegration.SendFailureMessageAsync(error, ResumeModes.JobDescription);
+      throw new InternalServerException(ResourceNames.JobRun, error);
+    }
+
+    await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, companyName, ResumeModes.JobDescription);
+    return new CreateResourceResponse<IDictionary<string, string>>(ResourceNames.Resume, new Dictionary<string, string>
+    {
+      ["mode"] = ResumeModes.JobDescription,
+      ["resumeName"] = resumeName,
+      ["pdfUrl"] = pdfUrl!
+    });
+  }
+
   private RazorLightEngine ConfigureRazorLightEngine()
   {
     return new RazorLightEngineBuilder()
@@ -150,15 +194,37 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
       .Build();
   }
 
-  private string CreateResumeDataHash(FetchResumeDto resumeData)
+  private string ReadJobDescription(IFormFile jobDescriptionFile)
   {
-    var json = JsonConvert.SerializeObject(resumeData, new JsonSerializerSettings
+    using var reader = new StreamReader(jobDescriptionFile.OpenReadStream());
+    return reader.ReadToEnd();
+  }
+
+  private FetchResumeDto ParseResumeDataJsonString(string resumeDataJsonString)
+  {
+    return JsonConvert.DeserializeObject<FetchResumeDto>(resumeDataJsonString) ?? new FetchResumeDto();
+  }
+
+  private async Task<(string? error, string? pdfUrl)> PollForJobStatus(long jobId)
+  {
+    var maxAttempts = 20;
+    var delay = 30000;
+
+    for (int attempt = 0; attempt < maxAttempts; ++attempt)
     {
-      ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
-      TypeNameHandling = TypeNameHandling.None
-    });
-    var bytes = Encoding.UTF8.GetBytes(json);
-    var hash = SHA256.HashData(bytes);
-    return Convert.ToBase64String(hash);
+      var resumeJob = await _supabaseIntegration.FetchJobStatusAsync(jobId);
+
+      if (resumeJob is not null && resumeJob.Status != "pending" && resumeJob.Status != "processing")
+      {
+        if (resumeJob.Status == "success") return (null, resumeJob.PdfUrl);
+        else return (resumeJob.Error, null);
+      }
+      if (attempt < maxAttempts)
+      {
+        await Task.Delay(delay);
+      }
+    }
+
+    return ("Job timed out", null);
   }
 }

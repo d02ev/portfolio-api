@@ -13,6 +13,8 @@ public static class DependencyInjection
       .AddScoped<IAboutService, AboutService>()
       .AddScoped<IProjectService, ProjectService>()
       .AddScoped<IExperienceService, ExperienceService>()
+      .AddScoped<IContactService, ContactService>()
+      .AddScoped<IEducationService, EducationService>()
       .AddScoped<IResumeService, ResumeService>();
 
     return services;

@@ -8,9 +8,11 @@ public static class SettingSectionNames
 
   public const string MongoDbSettings = "MongoDbSettings";
 
-  public const string CookieSettings = "CookieSettings";
-
   public const string GithubSettings = "GithubSettings";
+
+  public const string AiSettings = "AiSettings";
+
+  public const string TelegramSettings = "TelegramSettings";
 
   public const string SupabaseSettings = "SupabaseSettings";
 }

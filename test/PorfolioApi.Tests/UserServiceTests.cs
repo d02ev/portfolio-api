@@ -35,7 +35,6 @@ public class UserServiceTests
       Id = "user123",
       Username = "testuser",
       PasswordHash = "hashedpass",
-      Role = "user",
       RefreshToken = null
     };
     var userDto = new UserDto
@@ -59,8 +58,7 @@ public class UserServiceTests
     _authHelperMock
       .Setup(h => h.GenerateAccessToken(
          It.Is<IEnumerable<Claim>>(cs =>
-           cs.Any(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id) &&
-           cs.Any(c => c.Type == ClaimTypes.Role && c.Value == user.Role)
+           cs.Any(c => c.Type == ClaimTypes.NameIdentifier && c.Value == user.Id)
          )))
       .Returns("accessToken");
 
@@ -121,7 +119,6 @@ public class UserServiceTests
       Id = "user123",
       Username = "testuser",
       PasswordHash = "correctHash",
-      Role = "user"
     };
 
     var userDto = new UserDto
@@ -157,7 +154,6 @@ public class UserServiceTests
     // Arrange
     var refreshToken = "validToken";
     var userId = "user123";
-    var userRole = "admin";
     var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
     [
         new Claim(ClaimTypes.NameIdentifier, userId)
@@ -166,7 +162,6 @@ public class UserServiceTests
     var user = new User
     {
       Id = userId,
-      Role = userRole
     };
 
     _authHelperMock
@@ -180,8 +175,7 @@ public class UserServiceTests
     _authHelperMock
         .Setup(h => h.GenerateAccessToken(
             It.Is<IEnumerable<Claim>>(cs =>
-                cs.Any(c => c.Type == ClaimTypes.NameIdentifier && c.Value == userId) &&
-                cs.Any(c => c.Type == ClaimTypes.Role && c.Value == userRole)
+                cs.Any(c => c.Type == ClaimTypes.NameIdentifier && c.Value == userId)
             )))
         .Returns("newAccessToken");
 
@@ -260,8 +254,7 @@ public class UserServiceTests
     {
       Id = "royal-id-456",
       Username = userDto.Username,
-      PasswordHash = hash,
-      Role = "admin"
+      PasswordHash = hash
     };
 
     // Return null on first call, then createdUser on second call
@@ -278,8 +271,7 @@ public class UserServiceTests
         .Setup(r => r.CreateAsync(
             It.Is<User>(u =>
                 u.Username == userDto.Username &&
-                u.PasswordHash == hash &&
-                u.Role == "admin"
+                u.PasswordHash == hash
             )))
         .Returns(Task.CompletedTask);
 
@@ -309,7 +301,6 @@ public class UserServiceTests
       Id = "new-id-123",
       Username = userDto.Username,
       PasswordHash = generatedHash,
-      Role = "user"
     };
 
     // First call returns null (no existing user), second returns the created user
@@ -325,8 +316,7 @@ public class UserServiceTests
     _userRepositoryMock
         .Setup(r => r.CreateAsync(It.Is<User>(u =>
             u.Username == userDto.Username &&
-            u.PasswordHash == generatedHash &&
-            u.Role == "user"
+            u.PasswordHash == generatedHash
         )))
         .Returns(Task.CompletedTask);
 

@@ -30,9 +30,13 @@ public static class DependencyInjection
       .AddScoped<ITechStackRepository, TechStackRepository>()
       .AddScoped<IProjectRepository, ProjectRepository>()
       .AddScoped<IExperienceRepository, ExperienceRepository>()
+      .AddScoped<IContactRepository, ContactRepository>()
+      .AddScoped<IEducationRepository, EducationRepository>()
       .AddScoped<IAboutRepository, AboutRepository>()
       .AddScoped<IResumeRepository, ResumeRepository>()
       .AddScoped<ISupabaseIntegration, SupabaseIntegration>()
+      .AddScoped<ITelegramIntegration, TelegramIntegration>()
+      .AddScoped<IAiIntegration, AiIntegration>()
       .AddScoped<IGithubIntegration, GithubIntegration>();
 
     return services;

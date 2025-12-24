@@ -11,7 +11,7 @@ public class ProjectDto
   public string ShortDescription { get; set; } = string.Empty;
 
   [JsonProperty("longDescription")]
-  public string? LongDescription { get; set; } = string.Empty;
+  public List<string> LongDescription { get; set; } = [];
 
   [JsonProperty("techStack")]
   public List<string> TechStack { get; set; } = [];
@@ -44,7 +44,7 @@ public class FetchProjectDto
   public string ShortDescription { get; set; } = string.Empty;
 
   [JsonProperty("longDescription")]
-  public string LongDescription { get; set; } = string.Empty;
+  public List<string> LongDescription { get; set; } = [];
 
   [JsonProperty("techStack")]
   public List<string> TechStack { get; set; } = [];
@@ -65,7 +65,7 @@ public class UpdateProjectDto
   public string? ShortDescription { get; set; } = null;
 
   [JsonProperty("longDescription")]
-  public string? LongDescription { get; set; } = null;
+  public List<string>? LongDescription { get; set; } = null;
 
   [JsonProperty("techStack")]
   public List<string>? TechStack { get; set; } = null;

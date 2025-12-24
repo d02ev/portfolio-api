@@ -9,7 +9,5 @@ public interface IUserService
 
   Task<LoginUserResponse> LoginUser(UserDto userDto);
 
-  Task<ShortLivedTokenResponse> GenerateShortLivedToken(string username);
-
   Task<RefreshAccessTokenResponse> RefreshAccessToken(string refreshToken);
 }
