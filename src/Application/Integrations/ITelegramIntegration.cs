@@ -8,5 +8,7 @@ public interface ITelegramIntegration
 
   Task SendFailureMessageAsync(string errorMessage, string mode = ResumeModes.Generic);
 
+  Task SendInProgressMessageAsync(string mode = ResumeModes.Generic);
+
   Task SendWorkflowStartedMessageAsync();
 }

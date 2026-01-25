@@ -14,26 +14,26 @@ public class TelegramIntegration(IOptions<TelegramSettings> options) : ITelegram
 
   public async Task SendSuccessMessageAsync(string pdfUrl, string? companyName = null, string mode = ResumeModes.Generic)
   {
-    var message = @"
+    var message = $"""
     Resume generation successful!
 
-    Mode: " + mode + @"
-    Date Time (UTC): " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + @"
-    Company Name: " + companyName is not null ? companyName : "NA" + @"
-    PDF_URL: " + pdfUrl + @"
-    ";
+    Mode: {mode}
+    Date Time (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}
+    Company Name: {(companyName is not null ? companyName : "NA")}
+    PDF_URL: {pdfUrl}
+    """;
     await SendMessageAsync(message!);
   }
 
   public async Task SendFailureMessageAsync(string errorMessage, string mode = ResumeModes.Generic)
   {
-    var message = @"
+    var message = $"""
     Resume generation failed!
 
-    Mode: " + mode + @"
-    Date Time (UTC): " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + @"
-    ERROR: " + errorMessage + @"
-    ";
+    Mode: {mode}
+    Date Time (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}
+    ERROR: {errorMessage}
+    """;
     await SendMessageAsync(message);
   }
 
@@ -50,5 +50,16 @@ public class TelegramIntegration(IOptions<TelegramSettings> options) : ITelegram
     Date Time (UTC): " + DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + @"
     ";
     await SendMessageAsync(message);
+  }
+
+  public Task SendInProgressMessageAsync(string mode = ResumeModes.Generic)
+  {
+    var message = $"""
+    Resume generation in progress...
+
+    Mode: {mode}
+    Date Time (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}
+    """;
+    return SendMessageAsync(message);
   }
 }
