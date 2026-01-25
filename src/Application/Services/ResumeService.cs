@@ -86,7 +86,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     return new UpdateResourceResponse<IDictionary<string, object>>(ResourceNames.Resume, changes);
   }
 
-  public async Task<CreateResourceResponse<IDictionary<string, string>>> GenerateResume(GenerateResumeDto generateResumeDto)
+  public async Task<CreateResourceResponse<ResumeGenerationResponse>> GenerateResume(GenerateResumeDto generateResumeDto)
   {
     var resumeData = generateResumeDto.ResumeData;
     var templateId = generateResumeDto.TemplateId;
@@ -108,20 +108,20 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
 
     await _telegramIntegration.SendWorkflowStartedMessageAsync();
 
-    var (error, pdfUrl) = await PollForJobStatus(jobId);
-    if (error is not null)
-    {
-      await _telegramIntegration.SendFailureMessageAsync(error, ResumeModes.Generic);
-      throw new InternalServerException(ResourceNames.JobRun, error);
-    }
+    // var (error, pdfUrl) = await PollForJobStatus(jobId);
+    // if (error is not null)
+    // {
+    //   await _telegramIntegration.SendFailureMessageAsync(error, ResumeModes.Generic);
+    //   throw new InternalServerException(ResourceNames.JobRun, error);
+    // }
 
-    await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, ResumeModes.Generic);
+    // await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, ResumeModes.Generic);
 
-    return new CreateResourceResponse<IDictionary<string, string>>(ResourceNames.Resume, new Dictionary<string, string>
+    return new CreateResourceResponse<ResumeGenerationResponse>(ResourceNames.Resume, new ResumeGenerationResponse
     {
-      ["mode"] = ResumeModes.Generic,
-      ["resumeName"] = resumeName,
-      ["pdfUrl"] = pdfUrl!,
+      JobId = jobId,
+      ResumeName = resumeName,
+      LatexFileName = pushedFileName + ".tex"
     });
   }
 
@@ -145,7 +145,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     });
   }
 
-  public async Task<CreateResourceResponse<IDictionary<string, string>>> GenerateResumeForJob(GenerateResumeForJobDto generateResumeForJobDto)
+  public async Task<CreateResourceResponse<ResumeGenerationResponse>> GenerateResumeForJob(GenerateResumeForJobDto generateResumeForJobDto)
   {
     var resumeData = ParseResumeDataJsonString(generateResumeForJobDto.ResumeData);
     var templateId = generateResumeForJobDto.TemplateId;
@@ -170,19 +170,19 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
     await _telegramIntegration.SendWorkflowStartedMessageAsync();
 
-    var (error, pdfUrl) = await PollForJobStatus(jobId);
-    if (error is not null)
-    {
-      await _telegramIntegration.SendFailureMessageAsync(error, ResumeModes.JobDescription);
-      throw new InternalServerException(ResourceNames.JobRun, error);
-    }
+    // var (error, pdfUrl) = await PollForJobStatus(jobId);
+    // if (error is not null)
+    // {
+    //   await _telegramIntegration.SendFailureMessageAsync(error, ResumeModes.JobDescription);
+    //   throw new InternalServerException(ResourceNames.JobRun, error);
+    // }
 
-    await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, companyName, ResumeModes.JobDescription);
-    return new CreateResourceResponse<IDictionary<string, string>>(ResourceNames.Resume, new Dictionary<string, string>
+    // await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, companyName, ResumeModes.JobDescription);
+    return new CreateResourceResponse<ResumeGenerationResponse>(ResourceNames.Resume, new ResumeGenerationResponse
     {
-      ["mode"] = ResumeModes.JobDescription,
-      ["resumeName"] = resumeName,
-      ["pdfUrl"] = pdfUrl!
+      JobId = jobId,
+      ResumeName = resumeName,
+      LatexFileName = pushedFileName + ".tex"
     });
   }
 

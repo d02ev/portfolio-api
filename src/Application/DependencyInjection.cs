@@ -15,6 +15,7 @@ public static class DependencyInjection
       .AddScoped<IExperienceService, ExperienceService>()
       .AddScoped<IContactService, ContactService>()
       .AddScoped<IEducationService, EducationService>()
+      .AddScoped<INotificationService, NotificationService>()
       .AddScoped<IResumeService, ResumeService>();
 
     return services;

@@ -60,7 +60,7 @@ public class SupabaseIntegration : ISupabaseIntegration
   {
     var result = await _client.From<ResumeJob>()
       .Select("pdf_url")
-      .Where(x => x.Status == "success")
+      .Where(x => x.Status == "success" && x.Mode == "generic")
       .Order("created_at", Constants.Ordering.Descending)
       .Limit(1)
       .Get();

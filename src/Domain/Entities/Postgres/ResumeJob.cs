@@ -18,6 +18,9 @@ public class ResumeJob : BaseModel
   [Column("error")]
   public string? Error { get; set; } = null;
 
+  [Column("mode")]
+  public string Mode { get; set; } = "generic";
+
   [Column("created_at")]
   public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
