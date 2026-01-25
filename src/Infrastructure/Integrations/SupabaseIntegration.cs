@@ -44,9 +44,9 @@ public class SupabaseIntegration : ISupabaseIntegration
     return System.Text.Encoding.UTF8.GetString(fileBytes);
   }
 
-  public async Task<long> InsertJobStatusAsync()
+  public async Task<long> InsertJobStatusAsync(string latexFileName, string? companyName = null)
   {
-    var newResumeJobEntry = await _client.From<ResumeJob>().Insert(new ResumeJob { Status = "pending" }, new QueryOptions { Returning = QueryOptions.ReturnType.Representation });
+    var newResumeJobEntry = await _client.From<ResumeJob>().Insert(new ResumeJob { Status = "pending",  LatexFileName = latexFileName, CompanyName = companyName }, new QueryOptions { Returning = QueryOptions.ReturnType.Representation });
     return newResumeJobEntry.Models.First().Id;
   }
 

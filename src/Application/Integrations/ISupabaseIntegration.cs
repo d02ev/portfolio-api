@@ -8,7 +8,7 @@ public interface ISupabaseIntegration
 
   Task<byte[]> DownloadFileAsBytesAsync(string filename);
 
-  Task<long> InsertJobStatusAsync();
+  Task<long> InsertJobStatusAsync(string latexFileName, string? companyName = null);
 
   Task<ResumeJob?> FetchJobStatusAsync(long jobId);
 

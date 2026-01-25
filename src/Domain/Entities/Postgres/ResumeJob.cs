@@ -21,6 +21,12 @@ public class ResumeJob : BaseModel
   [Column("mode")]
   public string Mode { get; set; } = "generic";
 
+  [Column("company_name")]
+  public string? CompanyName { get; set; } = null;
+
+  [Column("latex_file_name")]
+  public string LatexFileName { get; set; } = string.Empty;
+
   [Column("created_at")]
   public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
