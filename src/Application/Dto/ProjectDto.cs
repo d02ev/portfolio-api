@@ -7,11 +7,14 @@ public class ProjectDto
   [JsonProperty("displayName")]
   public string DisplayName { get; set; } = string.Empty;
 
+  [JsonProperty("year")]
+  public int Year { get; set; } = DateTime.UtcNow.Year;
+
   [JsonProperty("shortDescription")]
   public string ShortDescription { get; set; } = string.Empty;
 
   [JsonProperty("longDescription")]
-  public List<string> LongDescription { get; set; } = [];
+  public string LongDescription { get; set; } = string.Empty;
 
   [JsonProperty("techStack")]
   public List<string> TechStack { get; set; } = [];
@@ -40,11 +43,14 @@ public class FetchProjectDto
   [JsonProperty("displayName")]
   public string DisplayName { get; set; } = string.Empty;
 
+  [JsonProperty("year")]
+  public int Year { get; set; } = DateTime.UtcNow.Year;
+
   [JsonProperty("shortDescription")]
   public string ShortDescription { get; set; } = string.Empty;
 
   [JsonProperty("longDescription")]
-  public List<string> LongDescription { get; set; } = [];
+  public string LongDescription { get; set; } = string.Empty;
 
   [JsonProperty("techStack")]
   public List<string> TechStack { get; set; } = [];
@@ -61,11 +67,14 @@ public class UpdateProjectDto
   [JsonProperty("displayName")]
   public string? DisplayName { get; set; } = null;
 
+  [JsonProperty("year")]
+  public int? Year { get; set; } = null;
+
   [JsonProperty("shortDescription")]
   public string? ShortDescription { get; set; } = null;
 
   [JsonProperty("longDescription")]
-  public List<string>? LongDescription { get; set; } = null;
+  public string? LongDescription { get; set; } = null;
 
   [JsonProperty("techStack")]
   public List<string>? TechStack { get; set; } = null;

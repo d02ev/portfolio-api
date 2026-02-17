@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Application.Common;
 using Application.Dto;
 using Application.Helpers;
@@ -10,13 +8,12 @@ using AutoMapper;
 using Domain.Entities;
 using Domain.Exceptions;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
 using RazorLight;
 
 namespace Application.Services;
 
-public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration,IAiIntegration aiIntegration, IGithubIntegration githubIntegration, IMemoryCache cache, IMapper mapper) : IResumeService
+public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration,IAiIntegration aiIntegration, IGithubIntegration githubIntegration, IMapper mapper) : IResumeService
 {
   private readonly IResumeRepository _resumeRepository = resumeRepository;
   private readonly IExperienceRepository _experienceRepository = experienceRepository;
@@ -28,7 +25,6 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
   private readonly ITelegramIntegration _telegramIntegration = telegramIntegration;
   private readonly IAiIntegration _aiIntegration = aiIntegration;
   private readonly IGithubIntegration _githubIntegration = githubIntegration;
-  private readonly IMemoryCache _cache = cache;
   private readonly IMapper _mapper = mapper;
 
   public async Task<CreateResourceResponse> CreateResume(ResumeDto resumeDto)
@@ -50,21 +46,20 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
   public async Task<FetchResourceResponse<FetchResumeDto>> FetchResume()
   {
     var resume = await _resumeRepository.FetchAsync() ?? throw new NotFoundException(ResourceNames.Resume);
-    var experienceTask = _experienceRepository.FetchByIdsAsync(resume.ExperienceIds);
     var projectTask = _projectRepository.FetchByIdsAsync(resume.ProjectIds);
     var techStackTask = _techStackRepository.FetchByIdAsync(resume.TechStackId);
     var educationTask = _educationRepository.FetchByIdAsync(resume.EducationId);
     var contactTask = _contactRepository.FetchByIdAsync(resume.ContactId);
 
-    await Task.WhenAll(experienceTask, projectTask, techStackTask, educationTask, contactTask);
+    await Task.WhenAll(projectTask, techStackTask, educationTask, contactTask);
 
-    var experiences = await experienceTask;
-    experiences = [.. experiences.OrderByDescending(e => e.StartDate)];
+    var experiences = await _experienceRepository.FetchByIdsAsync(resume.ExperienceIds);
+    experiences = [.. experiences.OrderByDescending(e => e?.StartDate)];
 
-    var projects = await projectTask;
-    var techStack = await techStackTask;
-    var education = await educationTask;
-    var contact = await contactTask;
+    var projects = projectTask.Result;
+    var techStack = techStackTask.Result;
+    var education = educationTask.Result;
+    var contact = contactTask.Result;
 
     var fetchResumeDto = _mapper.Map<FetchResumeDto>(resume);
     fetchResumeDto.Projects = _mapper.Map<List<FetchProjectDto>>(projects);
@@ -107,15 +102,6 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
 
     await _telegramIntegration.SendWorkflowStartedMessageAsync();
-
-    // var (error, pdfUrl) = await PollForJobStatus(jobId);
-    // if (error is not null)
-    // {
-    //   await _telegramIntegration.SendFailureMessageAsync(error, ResumeModes.Generic);
-    //   throw new InternalServerException(ResourceNames.JobRun, error);
-    // }
-
-    // await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, ResumeModes.Generic);
 
     return new CreateResourceResponse<ResumeGenerationResponse>(ResourceNames.Resume, new ResumeGenerationResponse
     {

@@ -78,34 +78,53 @@
 \color[HTML]{1C033C}\textbf{Frameworks \& Platforms:} ")@string.Join(", ", Model.TechStack.FrameworksAndPlatforms)@Raw(@"\\[3pt]
 \color[HTML]{1C033C}\textbf{Databases:} ")@string.Join(", ", Model.TechStack.Databases)@Raw(@"\\[3pt]
 \color[HTML]{1C033C}\textbf{Cloud \& DevOps:} ")@string.Join(", ", Model.TechStack.CloudAndDevOps)@Raw(@"\\[3pt]
-\color[HTML]{1C033C}\textbf{Others:} ")@string.Join(", ", Model.TechStack.Others)@Raw(@"\\[3pt]
+\color[HTML]{1C033C}\textbf{Tools:} ")@string.Join(", ", Model.TechStack.Others)@Raw(@"\\[3pt]
 
 %Experience
 \section{Work Experience}")
-@foreach (var exp in Model.Experience)
-{
+@{
+    var groupedExperiences = Model.Experience.GroupBy(e => new { e.CompanyName, e.Location }).ToList();
+    foreach (var companyGroup in groupedExperiences)
+    {
+        var experiences = companyGroup.ToList();
+        var isFirst = true;
+        foreach (var exp in experiences)
+        {
+            if (isFirst)
+            {
 @Raw(@"
 \begin{tabularx}{\linewidth}{ @{}l r@{} }
-\textbf{")@exp.CompanyName@Raw(@", ")@exp.Location@Raw(@"} \hfill \color[HTML]{371e77} ")@exp.StartDate@(exp.EndDate != null ? " - " + exp.EndDate : " - Present")@Raw(@" \\[4pt]
-\color[HTML]{371e77}\textbf{\textit{")@exp.JobTitle@Raw(@"}}\ \hfill \color[HTML]{4B28A4} \\[5pt]")
-    if (exp.Description != null && exp.Description.Any())
-    {
+\textbf{")@exp.CompanyName@Raw(@", ")@exp.Location@Raw(@"} \hfill \color[HTML]{371e77} \\[4pt]
+\color[HTML]{371e77}\textbf{\textit{")@exp.JobTitle@Raw(@"}}\  \hfill \color[HTML]{4B28A4} ")@exp.StartDate@(exp.EndDate != null ? " - " + exp.EndDate : " - Present")@Raw(@" \\[5pt]")
+                isFirst = false;
+            }
+            else
+            {
+@Raw(@"
+\begin{tabularx}{\linewidth}{ @{}l r@{} }
+\color[HTML]{371e77}\textbf{\textit{")@exp.JobTitle@Raw(@"}}\  \hfill \color[HTML]{4B28A4} ")@exp.StartDate@(exp.EndDate != null ? " - " + exp.EndDate : " - Present")@Raw(@" \\[5pt]")
+            }
+            if (exp.Description != null && exp.Description.Any())
+            {
 @Raw(@"
 \begin{minipage}[t]{\linewidth}
     \begin{itemize}[nosep,after=\strut, leftmargin=2em, itemsep=2pt]")
-        foreach (var d in exp.Description)
-        {
+                foreach (var d in exp.Description)
+                {
 @Raw(@"
         \item ")@d
-        }
+                }
 @Raw(@"
     \end{itemize}
 \end{minipage}")
-    }
+            }
 @Raw(@"
 \end{tabularx}\\[3pt]
-
 ")
+        }
+@Raw(@"
+")
+    }
 }
 
 @Raw(@"
@@ -130,24 +149,17 @@
 @foreach (var proj in Model.Projects)
 {
 @Raw(@"
-        \item \textbf{")@proj.DisplayName@Raw(@":}")
+        \item \textbf{")@proj.DisplayName@Raw(@" (")@proj.Year@Raw(@"):} ")
     if (proj.LongDescription != null && proj.LongDescription.Any())
     {
-@Raw(@"
-            \begin{itemize}[nosep, leftmargin=2em, itemsep=1pt]")
-        foreach (var line in proj.LongDescription)
-        {
-@Raw(@"
-                \item ")@line
-        }
-        if (proj.TechStack != null && proj.TechStack.Any())
-        {
-@Raw(@"
-                \item \textit{Tech:} ")@string.Join(", ", proj.TechStack)
-        }
-@Raw(@"
-            \end{itemize}")
+        @string.Join(" ", proj.LongDescription)
     }
+    if (proj.TechStack != null && proj.TechStack.Any())
+    {
+        @(" " + string.Join(", ", proj.TechStack))
+    }
+@Raw(@"
+")
 }
 @Raw(@"
     \end{itemize}

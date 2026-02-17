@@ -1,8 +1,10 @@
+using Application.Dto;
 using Application.Integrations;
 using Domain.Configurations;
 using Domain.Entities.Postgres;
 using Domain.Exceptions;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Supabase;
 using Supabase.Postgrest;
 using Supabase.Storage;

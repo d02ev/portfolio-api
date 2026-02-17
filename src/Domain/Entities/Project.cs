@@ -9,12 +9,16 @@ public class Project : BaseEntity
   [BsonRepresentation(BsonType.String)]
   public string DisplayName { get; set; } = string.Empty;
 
+  [BsonElement("year")]
+  [BsonRepresentation(BsonType.Int32)]
+  public int Year { get; set; } = DateTime.UtcNow.Year;
+
   [BsonElement("shortDescription")]
   [BsonRepresentation(BsonType.String)]
   public string ShortDescription { get; set; } = string.Empty;
 
   [BsonElement("longDescription")]
-  public List<string> LongDescription { get; set; } = [];
+  public string LongDescription { get; set; } = string.Empty;
 
   [BsonElement("techStack")]
   public List<string> TechStack { get; set; } = [];
