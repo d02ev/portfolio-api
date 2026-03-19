@@ -10,6 +10,7 @@ using Newtonsoft.Json.Serialization;
 using WebAPI.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("/etc/secrets/appsettings.Production.json", optional: true, reloadOnChange: false);
 
 builder.Services
     .AddMemoryCache()

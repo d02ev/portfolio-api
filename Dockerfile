@@ -26,7 +26,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system --gid 1001 dotnetgroup && \
-    adduser --system --uid 1001 --ingroup dotnetgroup dotnetuser
+    adduser --system --uid 1001 --ingroup dotnetgroup dotnetuser && \
+    if getent group 1000 >/dev/null; then \
+        adduser dotnetuser "$(getent group 1000 | cut -d: -f1)"; \
+    else \
+        addgroup --system --gid 1000 rendersecrets && \
+        adduser dotnetuser rendersecrets; \
+    fi
 
 COPY --from=build /app/publish .
 

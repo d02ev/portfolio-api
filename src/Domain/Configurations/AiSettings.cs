@@ -7,4 +7,8 @@ public class AiSettings
   public string Url { get; set; } = string.Empty;
 
   public string Model { get; set; } = string.Empty;
+
+  public int GenericOptimisationPasses { get; set; } = 3;
+
+  public int JobOptimisationPasses { get; set; } = 3;
 }
