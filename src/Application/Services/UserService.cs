@@ -75,10 +75,10 @@ public class UserService(IUserRepository userRepository, IAuthHelper authHelper)
     };
 
     await _userRepository.CreateAsync(user);
-    var newUser = await _userRepository.FetchByUsernameAsync(userDto.Username);
+    var newUser = await _userRepository.FetchByUsernameAsync(userDto.Username) ?? throw new InternalServerException(ResourceNames.User, "An error occurred while creating the user.");
     var data = new Dictionary<string, string>
     {
-      { "id", newUser!.Id }
+      { "id", newUser.Id }
     };
 
     return new CreateResourceResponse<IDictionary<string, string>>(ResourceNames.User, data);

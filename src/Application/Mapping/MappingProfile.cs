@@ -23,7 +23,12 @@ public class MappingProfile : Profile
       {
         opts.PreCondition(e => !string.IsNullOrEmpty(e.EndDate));
         opts.MapFrom(_ => DateHelper.ConvertMonthYearStringToDate(_.EndDate!));
-      });
+      })
+      .ForMember(e => e.IsDeleted, opts => opts.Ignore())
+      .ForMember(e => e.DeletedAt, opts => opts.Ignore())
+      .ForMember(e => e.Id, opts => opts.Ignore())
+      .ForMember(e => e.CreatedAt, opts => opts.Ignore())
+      .ForMember(e => e.UpdatedAt, opts => opts.Ignore());
     CreateMap<Experience, FetchExperienceDto>()
       .ForMember(e => e.StartDate, opts => opts.MapFrom(_ => DateHelper.ConvertDateToMonthYearString(_.StartDate)))
       .ForMember(e => e.EndDate, opts =>
@@ -42,6 +47,11 @@ public class MappingProfile : Profile
         opts.PreCondition(e => !string.IsNullOrEmpty(e.EndDate));
         opts.MapFrom(_ => DateHelper.ConvertMonthYearStringToDate(_.EndDate!));
       })
+      .ForMember(e => e.IsDeleted, opts => opts.Ignore())
+      .ForMember(e => e.DeletedAt, opts => opts.Ignore())
+      .ForMember(e => e.Id, opts => opts.Ignore())
+      .ForMember(e => e.CreatedAt, opts => opts.Ignore())
+      .ForMember(e => e.UpdatedAt, opts => opts.Ignore())
       .ReverseMap();
     #endregion
 
@@ -52,7 +62,8 @@ public class MappingProfile : Profile
       .ReverseMap();
     CreateMap<BioHighlight, BioHighlightDto>()
       .ReverseMap();
-    CreateMap<About, FetchAboutDto>();
+    CreateMap<About, FetchAboutDto>()
+      .ForMember(a => a.TechStack, opts => opts.Ignore());
     #endregion
 
     #region TechStack
@@ -76,7 +87,12 @@ public class MappingProfile : Profile
     #region Resume
     CreateMap<Resume, ResumeDto>()
       .ReverseMap();
-    CreateMap<Resume, FetchResumeDto>();
+    CreateMap<Resume, FetchResumeDto>()
+      .ForMember(r => r.Contact, opts => opts.Ignore())
+      .ForMember(r => r.Education, opts => opts.Ignore())
+      .ForMember(r => r.Experience, opts => opts.Ignore())
+      .ForMember(r => r.Projects, opts => opts.Ignore())
+      .ForMember(r => r.TechStack, opts => opts.Ignore());
     #endregion
   }
 }

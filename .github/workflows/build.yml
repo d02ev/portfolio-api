@@ -1,0 +1,37 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Clean
+        run: dotnet clean PortfolioApi.sln
+
+      - name: Restore
+        run: dotnet restore PortfolioApi.sln
+
+      - name: Build
+        run: dotnet build PortfolioApi.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test PortfolioApi.sln -c Release --no-build

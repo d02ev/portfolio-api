@@ -359,4 +359,33 @@ public class UserServiceTests
         );
   }
 
+  [Fact]
+  public async Task RegisterUser_ShouldThrowInternalServerException_WhenCreatedUserCannotBeFetched()
+  {
+    var userDto = new UserDto
+    {
+      Username = "testuser",
+      Password = "anyPass"
+    };
+
+    _userRepositoryMock
+        .SetupSequence(r => r.FetchByUsernameAsync(userDto.Username))
+        .ReturnsAsync((User)null)
+        .ReturnsAsync((User)null);
+
+    _authHelperMock
+        .Setup(h => h.GeneratePasswordHash(userDto.Password))
+        .Returns("hashed");
+
+    Func<Task> act = () => _userService.RegisterUser(userDto);
+
+    await act
+        .Should()
+        .ThrowAsync<InternalServerException>()
+        .Where(ex =>
+            ex.ResourceName == ResourceNames.User &&
+            ex.StatusCode == (int)HttpStatusCode.InternalServerError
+        );
+  }
+
 }

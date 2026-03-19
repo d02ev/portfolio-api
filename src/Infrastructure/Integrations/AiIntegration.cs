@@ -13,6 +13,9 @@ namespace Infrastructure.Integrations;
 
 public class AiIntegration : IAiIntegration
 {
+  private const int DefaultGenericOptimisationPasses = 3;
+  private const int DefaultJobOptimisationPasses = 3;
+
   private readonly AiSettings _aiSettings;
   private readonly ChatClient _client;
   private readonly ChatCompletionOptions _requestOptions;
@@ -32,65 +35,287 @@ public class AiIntegration : IAiIntegration
 
   public async Task<FetchResumeDto> OptimiseForJobAsync(FetchResumeDto resumeData, List<FetchProjectDto> projects, string jobDescription)
   {
-    var systemPrompt = @"
-    You are an AI resume optimization engine designed to rewrite resume content for ATS compliance and recruiter readability.
+    var originalResumeJson = JsonConvert.SerializeObject(resumeData);
+    var jobOptimisationPasses = GetJobOptimisationPasses();
+    var passCount = ResolvePassCount(_aiSettings.JobOptimisationPasses, DefaultJobOptimisationPasses, jobOptimisationPasses.Count);
 
-    Task: Rewrite values in the provided resume JSON so they align strongly with the supplied Job Description (JD), maximize ATS relevance, and strictly follow modern industry resume-writing standards for a software engineer with 3–5 years of experience. Apply all optimization rules uniformly across every section of the resume JSON, including experience, projects, skills, education, certifications, and links.
+    var finalResumeJson = await RunOptimisationPassesAsync(
+      originalResumeJson,
+      [.. jobOptimisationPasses.Take(passCount)],
+      currentResumeJson => JsonConvert.SerializeObject(new
+      {
+        job_description = jobDescription,
+        original_resume = JToken.Parse(originalResumeJson),
+        current_resume = JToken.Parse(currentResumeJson),
+        projects_pool = JArray.FromObject(projects)
+      }));
 
-    Preserve exact JSON structure, keys, and factual meaning. Do NOT fabricate achievements. Do NOT change metrics, numbers, or dates. Do NOT modify fields with null dates. Do NOT add or remove keys (except _issues and score). Output only valid JSON.
-
-    Experience Optimization Rules (STRICT): rewrite, reorder, and selectively remove bullet points within each experience role to maximize alignment with the JD; retain only the most JD-relevant bullets (typically 3–5 per role); prioritize bullets demonstrating direct skill, technology, or responsibility matches with the JD; deprioritize or remove generic, redundant, or weakly aligned bullets; ensure every retained bullet starts with a strong action verb and focuses on measurable or outcome-driven impact.
-
-    Project Selection Rules (STRICT): you will be provided a list of candidate projects; include at most 2 projects that most strongly align with the JD based on technologies, problem domain, and responsibilities; rewrite selected project bullets for ATS strength and JD relevance; remove or ignore projects with weak or no alignment; do NOT invent new projects.
-
-    Allowed: rewrite bullet points for clarity, impact, and JD alignment; add JD-relevant technical keywords, tools, and terminology without keyword stuffing; strengthen action verbs while preserving factual meaning.
-
-    Industry Content Rules (STRICT): each bullet must start with a strong action verb; focus on achievements and outcomes rather than responsibilities; prefer metric-first phrasing when metrics already exist; keep bullets concise (typically 12–20 words); limit bullets per experience role to 3–5; limit bullets per project to 2–4; avoid filler words, repetition, passive voice, and vague language; maintain consistent tense (past for past roles, present for current roles).
-
-    ATS Scoring: after optimization, add a numeric field named 'score' (0–100) representing the estimated ATS alignment accuracy with the JD.
-
-    Issues Handling: if any field is unclear, missing, or malformed, include it in a top-level _issues array (empty if none).";
-    var userPrompt = JsonConvert.SerializeObject(new
-    {
-      jd = JsonConvert.SerializeObject(jobDescription),
-      resume = JsonConvert.SerializeObject(resumeData),
-      projects_pool = JsonConvert.SerializeObject(projects)
-    });
-    var messages = new List<ChatMessage>()
-    {
-      new SystemChatMessage(systemPrompt),
-      new UserChatMessage(userPrompt)
-    };
-    var response = await _client.CompleteChatAsync(messages, _requestOptions);
-    var jdOptimisedResumeData = EscapePercentHashInJsonString(CleanResponse(response.Value.Content[0].Text));
-
-    return JsonConvert.DeserializeObject<FetchResumeDto>(jdOptimisedResumeData)!;
+    return DeserializeResume(finalResumeJson);
   }
 
   public async Task<FetchResumeDto> OptimiseGenericAsync(FetchResumeDto resumeData)
   {
-    var systemPrompt = @"
-    You are an AI resume optimization engine designed to rewrite resume content for ATS compliance and recruiter readability.
+    var originalResumeJson = JsonConvert.SerializeObject(resumeData);
+    var genericOptimisationPasses = GetGenericOptimisationPasses();
+    var passCount = ResolvePassCount(_aiSettings.GenericOptimisationPasses, DefaultGenericOptimisationPasses, genericOptimisationPasses.Count);
 
-    Task: Rewrite values in the provided resume JSON to improve grammar, clarity, technical impact, and ATS strength while strictly following modern industry resume-writing standards for a software engineer with 3–5 years of experience. Preserve exact JSON structure, keys, and factual meaning. Apply all optimization rules uniformly across every section of the resume JSON, including but not limited to experience, projects, skills, education, certifications, and links.
+    var finalResumeJson = await RunOptimisationPassesAsync(
+      originalResumeJson,
+      [.. genericOptimisationPasses.Take(passCount)],
+      currentResumeJson => JsonConvert.SerializeObject(new
+      {
+        original_resume = JToken.Parse(originalResumeJson),
+        current_resume = JToken.Parse(currentResumeJson)
+      }));
 
-    Do NOT change metrics, numbers, or dates; do NOT fabricate achievements; do NOT modify fields with null dates; do NOT add or remove keys (except _issues). Output only valid JSON.
+    return DeserializeResume(finalResumeJson);
+  }
 
-    Allowed: rewrite bullet points for impact and clarity; add relevant technical and domain keywords; strengthen action verbs and phrasing while preserving meaning.
+  private async Task<string> RunOptimisationPassesAsync(string originalResumeJson, List<OptimisationPass> optimisationPasses, Func<string, string> createUserPrompt)
+  {
+    var currentResumeJson = originalResumeJson;
 
-    Industry Content Rules (STRICT): each bullet must start with a strong action verb (e.g., Developed, Implemented, Optimized, Designed, Automated, Integrated, Deployed); focus on achievements and outcomes, not responsibilities; prefer metric-first phrasing when metrics already exist; keep bullet points concise (typically 12–20 words); limit bullets per experience role to 3–5; limit bullets per project to 2–4; avoid filler words, repetition, passive voice, and vague language; maintain consistent tense (past for past roles, present for current roles).
+    foreach (var optimisationPass in optimisationPasses)
+    {
+      currentResumeJson = await ExecuteOptimisationPassAsync(optimisationPass.SystemPrompt, createUserPrompt(currentResumeJson));
+    }
 
-    Issues Handling: if any field is missing, unclear, or malformed, include it in a top-level _issues array (empty if none).";
-    var userPrompt = JsonConvert.SerializeObject(resumeData);
+    return currentResumeJson;
+  }
+
+  private async Task<string> ExecuteOptimisationPassAsync(string systemPrompt, string userPrompt)
+  {
     var messages = new List<ChatMessage>()
     {
       new SystemChatMessage(systemPrompt),
       new UserChatMessage(userPrompt)
     };
-    var response = await _client.CompleteChatAsync(messages, _requestOptions);
-    var optimisedResumeData = EscapePercentHashInJsonString(CleanResponse(response.Value.Content[0].Text));
 
-    return JsonConvert.DeserializeObject<FetchResumeDto>(optimisedResumeData)!;
+    var response = await _client.CompleteChatAsync(messages, _requestOptions);
+    return CleanAndNormaliseJsonResponse(response.Value.Content[0].Text);
+  }
+
+  private static FetchResumeDto DeserializeResume(string resumeJson)
+  {
+    var escapedResumeJson = EscapePercentHashInJsonString(resumeJson);
+    return JsonConvert.DeserializeObject<FetchResumeDto>(escapedResumeJson)!;
+  }
+
+  private static List<OptimisationPass> GetGenericOptimisationPasses()
+  {
+    return
+    [
+      new OptimisationPass(
+        "Generic Draft",
+        """
+        You are an AI resume optimization engine designed to rewrite resume content for ATS compliance and recruiter readability.
+
+        You will receive:
+        - original_resume: the factual source of truth
+        - current_resume: the working draft to improve
+
+        Pass objective: create a strong first-pass rewrite that improves grammar, clarity, action verbs, technical impact, and overall readability across every section of the resume JSON.
+
+        Strict constraints:
+        - Preserve exact JSON structure and keys from current_resume.
+        - Preserve factual meaning from original_resume.
+        - Do NOT fabricate achievements.
+        - Do NOT change metrics, numbers, or dates.
+        - Do NOT modify fields with null dates.
+        - Do NOT add or remove keys except a top-level _issues array if needed.
+        - Output only valid JSON.
+
+        Content rules:
+        - Every bullet must start with a strong action verb.
+        - Focus on outcomes and impact rather than responsibilities.
+        - Prefer concise bullet points, typically 12-20 words.
+        - Limit bullets per experience role to 3-5.
+        - Limit bullets per project to 2-4.
+        - Avoid filler words, repetition, passive voice, and vague language.
+        - Maintain consistent tense.
+
+        If any field is unclear, missing, or malformed, include it in a top-level _issues array. Otherwise return an empty _issues array.
+        """),
+      new OptimisationPass(
+        "Generic Refinement",
+        """
+        You are performing pass 2 of resume optimization.
+
+        You will receive:
+        - original_resume: the factual source of truth
+        - current_resume: the latest optimized draft
+
+        Pass objective: refine the draft for ATS strength. Improve keyword coverage, remove redundancy, tighten phrasing, and strengthen technical specificity without changing facts.
+
+        Strict constraints:
+        - Preserve exact JSON structure and keys from current_resume.
+        - Use original_resume as the factual guardrail.
+        - Do NOT fabricate achievements.
+        - Do NOT change metrics, numbers, or dates.
+        - Do NOT modify fields with null dates.
+        - Do NOT add or remove keys except a top-level _issues array if needed.
+        - Output only valid JSON.
+
+        Refinement rules:
+        - Keep only the strongest, most specific bullets when multiple bullets say similar things.
+        - Improve ATS terminology naturally without keyword stuffing.
+        - Strengthen weak verbs, vague nouns, and generic phrasing.
+        - Preserve readability for human reviewers.
+        - Make only changes that materially improve the draft.
+
+        Return the full updated JSON.
+        """),
+      new OptimisationPass(
+        "Generic Final QA",
+        """
+        You are performing the final quality pass for a resume JSON.
+
+        You will receive:
+        - original_resume: the factual source of truth
+        - current_resume: the near-final draft
+
+        Pass objective: perform a final QA review and make only minimal edits needed to improve consistency, grammar, tense, formatting, and ATS readiness.
+
+        Strict constraints:
+        - Preserve exact JSON structure and keys from current_resume.
+        - Use original_resume as the factual guardrail.
+        - Do NOT fabricate achievements.
+        - Do NOT change metrics, numbers, or dates.
+        - Do NOT modify fields with null dates.
+        - Do NOT add or remove keys except a top-level _issues array if needed.
+        - Output only valid JSON.
+
+        Final QA checklist:
+        - Consistent tense and punctuation across bullets.
+        - Strong action verb at the start of every bullet.
+        - Concise, high-signal bullets with no unnecessary repetition.
+        - Clean wording across experience, projects, skills, education, certifications, and links.
+
+        Return the full updated JSON and include a top-level _issues array.
+        """)
+    ];
+  }
+
+  private static List<OptimisationPass> GetJobOptimisationPasses()
+  {
+    return
+    [
+      new OptimisationPass(
+        "JD Alignment Draft",
+        """
+        You are an AI resume optimization engine designed to rewrite resume content for ATS compliance and recruiter readability.
+
+        You will receive:
+        - job_description
+        - original_resume: the factual source of truth
+        - current_resume: the working draft to improve
+        - projects_pool: candidate projects you may choose from
+
+        Pass objective: rewrite the resume JSON so it aligns strongly with the supplied job description while preserving factual accuracy.
+
+        Strict constraints:
+        - Preserve exact JSON structure and keys from current_resume.
+        - Preserve factual meaning from original_resume.
+        - Do NOT fabricate achievements.
+        - Do NOT change metrics, numbers, or dates.
+        - Do NOT modify fields with null dates.
+        - Do NOT add or remove keys except top-level _issues and score.
+        - Output only valid JSON.
+
+        Experience optimization rules:
+        - Rewrite, reorder, and selectively remove bullets within each role to maximize job-description relevance.
+        - Keep typically 3-5 bullets per role.
+        - Prioritize bullets with direct technology, responsibility, and outcome alignment.
+        - Remove weak, redundant, or weakly aligned bullets.
+
+        Project selection rules:
+        - Include at most 2 projects that best align with the job description.
+        - Use projects_pool as the allowed source for project selection.
+        - Rewrite selected project content for ATS strength and role relevance.
+        - Do NOT invent projects.
+
+        Content rules:
+        - Every bullet must start with a strong action verb.
+        - Prefer concise bullets, typically 12-20 words.
+        - Add relevant keywords naturally without keyword stuffing.
+
+        Include a top-level numeric score from 0-100 for estimated ATS alignment and include a top-level _issues array.
+        """),
+      new OptimisationPass(
+        "JD Alignment Refinement",
+        """
+        You are performing pass 2 of job-targeted resume optimization.
+
+        You will receive:
+        - job_description
+        - original_resume: the factual source of truth
+        - current_resume: the latest optimized draft
+        - projects_pool
+
+        Pass objective: refine the draft to improve ATS relevance, keyword coverage, and recruiter readability for this job description.
+
+        Strict constraints:
+        - Preserve exact JSON structure and keys from current_resume.
+        - Use original_resume as the factual guardrail.
+        - Do NOT fabricate achievements.
+        - Do NOT change metrics, numbers, or dates.
+        - Do NOT modify fields with null dates.
+        - Do NOT add or remove keys except top-level _issues and score.
+        - Output only valid JSON.
+
+        Refinement rules:
+        - Keep only the strongest bullets for each experience and project entry.
+        - Increase direct match language for required skills, tools, and responsibilities.
+        - Remove repeated phrasing and generic statements.
+        - Improve the score only through genuine alignment, not keyword stuffing.
+        - Make only changes that materially improve alignment and readability.
+
+        Return the full updated JSON with score and _issues.
+        """),
+      new OptimisationPass(
+        "JD Final QA",
+        """
+        You are performing the final quality pass for a job-targeted resume JSON.
+
+        You will receive:
+        - job_description
+        - original_resume: the factual source of truth
+        - current_resume: the near-final draft
+        - projects_pool
+
+        Pass objective: make minimal final edits to ensure consistency, factual safety, ATS alignment, and high recruiter readability.
+
+        Strict constraints:
+        - Preserve exact JSON structure and keys from current_resume.
+        - Use original_resume as the factual guardrail.
+        - Do NOT fabricate achievements.
+        - Do NOT change metrics, numbers, or dates.
+        - Do NOT modify fields with null dates.
+        - Do NOT add or remove keys except top-level _issues and score.
+        - Output only valid JSON.
+
+        Final QA checklist:
+        - Strong action verbs and concise bullets throughout.
+        - Clear job-description alignment across experience, projects, skills, and education.
+        - No repeated bullets, filler language, or contradictory wording.
+        - Score reflects realistic ATS alignment with the current draft.
+
+        Return the full updated JSON with score and _issues.
+        """)
+    ];
+  }
+
+  private static int ResolvePassCount(int configuredPassCount, int defaultPassCount, int maxPassCount)
+  {
+    var passCount = configuredPassCount > 0 ? configuredPassCount : defaultPassCount;
+    return Math.Clamp(passCount, 1, maxPassCount);
+  }
+
+  private static string CleanAndNormaliseJsonResponse(string aiResponse)
+  {
+    var cleanedResponse = CleanResponse(aiResponse);
+    var token = JToken.Parse(cleanedResponse);
+    return token.ToString(Formatting.None);
   }
 
   private static string CleanResponse(string aiResponse)
@@ -135,9 +360,8 @@ public class AiIntegration : IAiIntegration
         var stringValue = token.Value<string>();
         if (!string.IsNullOrEmpty(stringValue) && (stringValue.Contains("%") || stringValue.Contains("#")))
         {
-          var escaped = stringValue
-            .Replace("%", "\\%")
-            .Replace("#", "\\#");
+          var escaped = Regex.Replace(stringValue, @"(?<!\\)%", "\\%");
+          escaped = Regex.Replace(escaped, @"(?<!\\)#", "\\#");
 
           if (token is JValue jValue)
           {
@@ -161,4 +385,6 @@ public class AiIntegration : IAiIntegration
         break;
     }
   }
+
+  private sealed record OptimisationPass(string Name, string SystemPrompt);
 }

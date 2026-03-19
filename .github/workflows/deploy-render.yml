@@ -1,0 +1,76 @@
+name: Deploy Render
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_OUTPUT: json
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Clean
+        run: dotnet clean PortfolioApi.sln
+
+      - name: Restore
+        run: dotnet restore PortfolioApi.sln
+
+      - name: Build
+        run: dotnet build PortfolioApi.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test PortfolioApi.sln -c Release --no-build
+
+      - name: Validate health check URL
+        env:
+          RENDER_HEALTHCHECK_URL: ${{ secrets.RENDER_HEALTHCHECK_URL }}
+        run: |
+          case "$RENDER_HEALTHCHECK_URL" in
+            http://*|https://*)
+              ;;
+            *)
+              echo "RENDER_HEALTHCHECK_URL must be a full URL, for example https://service.onrender.com/api/health"
+              exit 1
+              ;;
+          esac
+
+      - name: Install Render CLI
+        env:
+          RENDER_CLI_VERSION: v2.14.0
+        run: |
+          version="${RENDER_CLI_VERSION#v}"
+          curl -fsSL "https://github.com/render-oss/cli/releases/download/${RENDER_CLI_VERSION}/cli_${version}_linux_amd64.zip" -o render.zip
+          unzip -o render.zip
+          sudo mv "cli_${RENDER_CLI_VERSION}" /usr/local/bin/render
+          rm -f render.zip
+          render --version
+
+      - name: Trigger Render deploy
+        env:
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: render deploys create "$RENDER_SERVICE_ID" --commit "$GITHUB_SHA" --wait --output json --confirm
+
+      - name: Verify health check
+        env:
+          RENDER_HEALTHCHECK_URL: ${{ secrets.RENDER_HEALTHCHECK_URL }}
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "$RENDER_HEALTHCHECK_URL"

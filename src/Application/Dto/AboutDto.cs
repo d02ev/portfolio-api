@@ -63,10 +63,10 @@ public class FetchAboutDto
 public class UpdateAboutDto
 {
   [JsonProperty("bio")]
-  public UpdateBioDto? Bio { get; set; } = new UpdateBioDto();
+  public UpdateBioDto? Bio { get; set; } = null;
 
   [JsonProperty("funFact")]
-  public string? FunFact { get; set; } = string.Empty;
+  public string? FunFact { get; set; } = null;
 }
 
 public class UpdateBioDto
