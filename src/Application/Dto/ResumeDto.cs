@@ -79,6 +79,9 @@ public class GenerateResumeDto
 
   [JsonProperty("resumeName")]
   public string ResumeName { get; set; } = string.Empty;
+
+  [JsonProperty("companyName")]
+  public string? CompanyName { get; set; } = null;
 }
 
 public class GenerateResumeForJobDto

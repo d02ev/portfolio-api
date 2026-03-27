@@ -8,9 +8,7 @@ using Domain.Entities;
 using Domain.Entities.Postgres;
 using Domain.Exceptions;
 using FluentAssertions;
-using Microsoft.AspNetCore.Http;
 using Moq;
-using Newtonsoft.Json;
 
 namespace PorfolioApi.Tests;
 
@@ -24,7 +22,6 @@ public class ResumeServiceTests
   private readonly Mock<IContactRepository> _contactRepositoryMock;
   private readonly Mock<ISupabaseIntegration> _supabaseIntegrationMock;
   private readonly Mock<ITelegramIntegration> _telegramIntegrationMock;
-  private readonly Mock<IAiIntegration> _aiIntegrationMock;
   private readonly Mock<IGithubIntegration> _githubIntegrationMock;
   private readonly IResumeService _resumeService;
 
@@ -38,7 +35,6 @@ public class ResumeServiceTests
     _contactRepositoryMock = new Mock<IContactRepository>();
     _supabaseIntegrationMock = new Mock<ISupabaseIntegration>();
     _telegramIntegrationMock = new Mock<ITelegramIntegration>();
-    _aiIntegrationMock = new Mock<IAiIntegration>();
     _githubIntegrationMock = new Mock<IGithubIntegration>();
     _resumeService = new ResumeService(
       _resumeRepositoryMock.Object,
@@ -49,7 +45,6 @@ public class ResumeServiceTests
       _contactRepositoryMock.Object,
       _supabaseIntegrationMock.Object,
       _telegramIntegrationMock.Object,
-      _aiIntegrationMock.Object,
       _githubIntegrationMock.Object,
       TestMapperFactory.Create());
   }
@@ -156,10 +151,6 @@ public class ResumeServiceTests
     {
       Name = "Base Resume"
     };
-    var optimizedResume = new FetchResumeDto
-    {
-      Name = "Optimized Resume"
-    };
     var request = new GenerateResumeDto
     {
       ResumeData = resumeData,
@@ -167,7 +158,6 @@ public class ResumeServiceTests
       ResumeName = "vikram-resume"
     };
 
-    _aiIntegrationMock.Setup(a => a.OptimiseGenericAsync(resumeData)).ReturnsAsync(optimizedResume);
     _supabaseIntegrationMock.Setup(s => s.DownloadFileAsStringAsync("template-1"))
       .ReturnsAsync("Hello @Model.Name");
     _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), null))
@@ -181,51 +171,150 @@ public class ResumeServiceTests
     response.Data.LatexFileName.Should().StartWith("ge-").And.EndWith(".tex");
     _githubIntegrationMock.Verify(g => g.PushToRepositoryAsync(
       $"docs/{response.Data.LatexFileName}",
-      It.Is<string>(content => content.Contains("Optimized Resume"))), Times.Once);
+      It.Is<string>(content => content.Contains("Base Resume"))), Times.Once);
     _githubIntegrationMock.Verify(g => g.InitWorkflowAsync("42", "vikram-resume", response.Data.LatexFileName.Replace(".tex", string.Empty)), Times.Once);
     _telegramIntegrationMock.Verify(t => t.SendWorkflowStartedMessageAsync(), Times.Once);
   }
 
   [Fact]
-  public async Task GenerateResumeForJob_ShouldParseJsonReadFileAndStartWorkflow_WhenInputsAreValid()
+  public async Task GenerateResume_ShouldEscapeUnescapedHashAndPercentAcrossResumeData()
   {
-    var rawResume = new FetchResumeDto
+    var request = new GenerateResumeDto
     {
-      Name = "Base Resume"
+      ResumeData = new FetchResumeDto
+      {
+        Name = "Name #% ",
+        Contact = new FetchContactDto
+        {
+          Email = "user#%mail.com",
+          Mobile = "+1#%23",
+          Github = "https://github.com/dev#%",
+          Linkedin = "https://linkedin.com/in/dev#%",
+          Website = "https://site.dev/#%"
+        },
+        Education = new FetchEducationDto
+        {
+          Institute = "Inst#%",
+          StartDate = "Jan#% 2020",
+          EndDate = "May#% 2024",
+          Degree = "B.Tech#%",
+          Grade = "9.1#%",
+          Coursework = ["Algo#%"]
+        },
+        TechStack = new FetchTechStackDto
+        {
+          Languages = ["C#%"],
+          FrameworksAndPlatforms = [".NET#%"],
+          Databases = ["Postgres#%"],
+          CloudAndDevOps = ["Azure#%"],
+          Others = ["Docker#%"]
+        },
+        Experience =
+        [
+          new FetchExperienceDto
+          {
+            JobTitle = "Dev#%",
+            CompanyName = "Comp#%",
+            Location = "Loc#%",
+            StartDate = "Jan#% 2022",
+            EndDate = "Feb#% 2024",
+            Description = ["Built#% things"]
+          }
+        ],
+        Projects =
+        [
+          new FetchProjectDto
+          {
+            DisplayName = "Proj#%",
+            ShortDescription = "Short#%",
+            LongDescription = "Long#%",
+            RepoUrl = "https://repo#%",
+            LiveUrl = "https://live#%",
+            TechStack = ["TS#%"]
+          }
+        ]
+      },
+      TemplateId = "template-1",
+      ResumeName = "escaped-resume"
     };
-    var optimizedResume = new FetchResumeDto
+
+    _supabaseIntegrationMock.Setup(s => s.DownloadFileAsStringAsync("template-1"))
+      .ReturnsAsync("@Model.Name|@Model.Contact.Email|@Model.Education.Degree|@Model.TechStack.Languages[0]|@Model.Experience[0].Description[0]|@Model.Projects[0].DisplayName|@Model.Projects[0].TechStack[0]|@Model.Projects[0].LongDescription|@Model.Projects[0].RepoUrl");
+    _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), null))
+      .ReturnsAsync(55);
+
+    await _resumeService.GenerateResume(request);
+
+    _githubIntegrationMock.Verify(g => g.PushToRepositoryAsync(
+      It.IsAny<string>(),
+      It.Is<string>(content =>
+        content.Contains(@"Name \#\% ") &&
+        content.Contains(@"user\#\%mail.com") &&
+        content.Contains(@"B.Tech\#\%") &&
+        content.Contains(@"C\#\%") &&
+        content.Contains(@"Built\#\% things") &&
+        content.Contains(@"Proj\#\%") &&
+        content.Contains(@"TS\#\%") &&
+        content.Contains(@"Long\#\%") &&
+        content.Contains(@"https://repo\#\%"))), Times.Once);
+  }
+
+  [Fact]
+  public async Task GenerateResume_ShouldNotDoubleEscapeAlreadyEscapedHashAndPercent()
+  {
+    var request = new GenerateResumeDto
     {
-      Name = "Job Optimized Resume"
+      ResumeData = new FetchResumeDto
+      {
+        Name = @"Value \# \% # %"
+      },
+      TemplateId = "template-1",
+      ResumeName = "idempotent-resume"
     };
-    var request = new GenerateResumeForJobDto
+
+    _supabaseIntegrationMock.Setup(s => s.DownloadFileAsStringAsync("template-1"))
+      .ReturnsAsync("@Model.Name");
+    _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), null))
+      .ReturnsAsync(56);
+
+    await _resumeService.GenerateResume(request);
+
+    _githubIntegrationMock.Verify(g => g.PushToRepositoryAsync(
+      It.IsAny<string>(),
+      It.Is<string>(content =>
+        content == @"Value \# \% \# \%" &&
+        !content.Contains(@"\\#") &&
+        !content.Contains(@"\\%"))), Times.Once);
+  }
+
+  [Fact]
+  public async Task GenerateResume_ShouldUseJobPrefix_WhenCompanyNameIsProvided()
+  {
+    var resumeData = new FetchResumeDto
     {
-      ResumeData = JsonConvert.SerializeObject(rawResume),
+      Name = "Company Resume"
+    };
+    var request = new GenerateResumeDto
+    {
+      ResumeData = resumeData,
       TemplateId = "template-1",
       ResumeName = "vikram-job",
-      CompanyName = "OpenAI",
-      JobDescription = CreateFormFile("job-description.txt", "Build resilient APIs")
+      CompanyName = "OpenAI"
     };
 
-    _projectRepositoryMock.Setup(r => r.FetchAllAsync())
-      .ReturnsAsync([new Project { Id = "project-1", DisplayName = "Portfolio API", RepoUrl = "repo" }]);
-    _aiIntegrationMock.Setup(a => a.OptimiseForJobAsync(
-      It.Is<FetchResumeDto>(resume => resume.Name == "Base Resume"),
-      It.Is<List<FetchProjectDto>>(projects => projects.Count == 1 && projects[0].DisplayName == "Portfolio API"),
-      "Build resilient APIs"))
-      .ReturnsAsync(optimizedResume);
     _supabaseIntegrationMock.Setup(s => s.DownloadFileAsStringAsync("template-1"))
       .ReturnsAsync("Hello @Model.Name");
-    _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), "OpenAI"))
+    _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), null))
       .ReturnsAsync(87);
 
-    var response = await _resumeService.GenerateResumeForJob(request);
+    var response = await _resumeService.GenerateResume(request);
 
     response.StatusCode.Should().Be((int)HttpStatusCode.Created);
     response.Data.JobId.Should().Be(87);
     response.Data.LatexFileName.Should().StartWith("jd-").And.EndWith(".tex");
     _githubIntegrationMock.Verify(g => g.PushToRepositoryAsync(
       $"docs/{response.Data.LatexFileName}",
-      It.Is<string>(content => content.Contains("Job Optimized Resume"))), Times.Once);
+      It.Is<string>(content => content.Contains("Company Resume"))), Times.Once);
     _githubIntegrationMock.Verify(g => g.InitWorkflowAsync("87", "vikram-job", response.Data.LatexFileName.Replace(".tex", string.Empty)), Times.Once);
     _telegramIntegrationMock.Verify(t => t.SendWorkflowStartedMessageAsync(), Times.Once);
   }
@@ -272,12 +361,5 @@ public class ResumeServiceTests
 
     response.ResourceName.Should().Be("ResumePdfUrl");
     response.Data["pdfUrl"].Should().BeEmpty();
-  }
-
-  private static IFormFile CreateFormFile(string fileName, string content)
-  {
-    var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-    var stream = new MemoryStream(bytes);
-    return new FormFile(stream, 0, bytes.Length, "jobDescription", fileName);
   }
 }

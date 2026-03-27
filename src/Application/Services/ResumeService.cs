@@ -7,14 +7,15 @@ using Application.Responses;
 using AutoMapper;
 using Domain.Entities;
 using Domain.Exceptions;
-using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 using RazorLight;
+using System.Text.RegularExpressions;
 
 namespace Application.Services;
 
-public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration,IAiIntegration aiIntegration, IGithubIntegration githubIntegration, IMapper mapper) : IResumeService
+public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration, IGithubIntegration githubIntegration, IMapper mapper) : IResumeService
 {
+  private static readonly Regex LatexReservedCharacterRegex = new(@"(?<!\\)([#%])", RegexOptions.Compiled);
   private readonly IResumeRepository _resumeRepository = resumeRepository;
   private readonly IExperienceRepository _experienceRepository = experienceRepository;
   private readonly IProjectRepository _projectRepository = projectRepository;
@@ -23,7 +24,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
   private readonly IContactRepository _contactRepository = contactRepository;
   private readonly ISupabaseIntegration _supabaseIntegration = supabaseIntegration;
   private readonly ITelegramIntegration _telegramIntegration = telegramIntegration;
-  private readonly IAiIntegration _aiIntegration = aiIntegration;
+  // private readonly IAiIntegration _aiIntegration = aiIntegration;
   private readonly IGithubIntegration _githubIntegration = githubIntegration;
   private readonly IMapper _mapper = mapper;
 
@@ -86,64 +87,24 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     var resumeData = generateResumeDto.ResumeData;
     var templateId = generateResumeDto.TemplateId;
     var resumeName = generateResumeDto.ResumeName;
+    var companyName = generateResumeDto.CompanyName;
 
-    resumeData = await _aiIntegration.OptimiseGenericAsync(resumeData);
+    // resumeData = await _aiIntegration.OptimiseGenericAsync(resumeData);
+    EscapeResumeDataForLatex(resumeData);
 
     var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
     var engine = ConfigureRazorLightEngine();
     var result = await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
     result = System.Net.WebUtility.HtmlDecode(result);
-    var pushedFileName = $"ge-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
+    var pushedFileName = companyName is null ? $"ge-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}" : $"jd-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
 
     await _githubIntegration.PushToRepositoryAsync($"docs/{pushedFileName}.tex", result!);
 
     var jobId = await _supabaseIntegration.InsertJobStatusAsync(pushedFileName);
 
     await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
-
     await _telegramIntegration.SendWorkflowStartedMessageAsync();
 
-    return new CreateResourceResponse<ResumeGenerationResponse>(ResourceNames.Resume, new ResumeGenerationResponse
-    {
-      JobId = jobId,
-      ResumeName = resumeName,
-      LatexFileName = pushedFileName + ".tex"
-    });
-  }
-
-  public async Task<CreateResourceResponse<ResumeGenerationResponse>> GenerateResumeForJob(GenerateResumeForJobDto generateResumeForJobDto)
-  {
-    var resumeData = ParseResumeDataJsonString(generateResumeForJobDto.ResumeData);
-    var templateId = generateResumeForJobDto.TemplateId;
-    var resumeName = generateResumeForJobDto.ResumeName;
-    var jobDescription = ReadJobDescription(generateResumeForJobDto.JobDescription);
-    var companyName = generateResumeForJobDto.CompanyName;
-    var projects = await _projectRepository.FetchAllAsync();
-    var fetchProjectDtos = _mapper.Map<List<FetchProjectDto>>(projects);
-
-    resumeData = await _aiIntegration.OptimiseForJobAsync(resumeData, fetchProjectDtos, jobDescription);
-
-    var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
-    var engine = ConfigureRazorLightEngine();
-    var result = await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
-    result = System.Net.WebUtility.HtmlDecode(result);
-    var pushedFileName = $"jd-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
-
-    await _githubIntegration.PushToRepositoryAsync($"docs/{pushedFileName}.tex", result!);
-
-    var jobId = await _supabaseIntegration.InsertJobStatusAsync(pushedFileName, companyName);
-
-    await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
-    await _telegramIntegration.SendWorkflowStartedMessageAsync();
-
-    // var (error, pdfUrl) = await PollForJobStatus(jobId);
-    // if (error is not null)
-    // {
-    //   await _telegramIntegration.SendFailureMessageAsync(error, ResumeModes.JobDescription);
-    //   throw new InternalServerException(ResourceNames.JobRun, error);
-    // }
-
-    // await _telegramIntegration.SendSuccessMessageAsync(pdfUrl!, companyName, ResumeModes.JobDescription);
     return new CreateResourceResponse<ResumeGenerationResponse>(ResourceNames.Resume, new ResumeGenerationResponse
     {
       JobId = jobId,
@@ -172,7 +133,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
     });
   }
 
-  private RazorLightEngine ConfigureRazorLightEngine()
+  private static RazorLightEngine ConfigureRazorLightEngine()
   {
     return new RazorLightEngineBuilder()
       .UseEmbeddedResourcesProject(typeof(ResumeService))
@@ -180,37 +141,130 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
       .Build();
   }
 
-  private string ReadJobDescription(IFormFile jobDescriptionFile)
+  private static void EscapeResumeDataForLatex(FetchResumeDto resumeData)
   {
-    using var reader = new StreamReader(jobDescriptionFile.OpenReadStream());
-    return reader.ReadToEnd();
-  }
+    resumeData.Name = EscapeLatexReservedChars(resumeData.Name);
 
-  private FetchResumeDto ParseResumeDataJsonString(string resumeDataJsonString)
-  {
-    return JsonConvert.DeserializeObject<FetchResumeDto>(resumeDataJsonString) ?? new FetchResumeDto();
-  }
+    resumeData.Contact.Email = EscapeLatexReservedChars(resumeData.Contact.Email);
+    resumeData.Contact.Mobile = EscapeLatexReservedChars(resumeData.Contact.Mobile);
+    resumeData.Contact.Github = EscapeLatexReservedChars(resumeData.Contact.Github);
+    resumeData.Contact.Linkedin = EscapeLatexReservedChars(resumeData.Contact.Linkedin);
+    resumeData.Contact.Website = EscapeLatexReservedChars(resumeData.Contact.Website);
 
-  private async Task<(string? error, string? pdfUrl)> PollForJobStatus(long jobId)
-  {
-    var maxAttempts = 20;
-    var delay = 30000;
+    resumeData.Education.Institute = EscapeLatexReservedChars(resumeData.Education.Institute);
+    resumeData.Education.StartDate = EscapeLatexReservedChars(resumeData.Education.StartDate);
+    resumeData.Education.EndDate = EscapeLatexReservedChars(resumeData.Education.EndDate);
+    resumeData.Education.Degree = EscapeLatexReservedChars(resumeData.Education.Degree);
+    resumeData.Education.Grade = EscapeLatexReservedChars(resumeData.Education.Grade);
+    EscapeStringListForLatex(resumeData.Education.Coursework);
 
-    for (int attempt = 0; attempt < maxAttempts; ++attempt)
+    EscapeStringListForLatex(resumeData.TechStack.Languages);
+    EscapeStringListForLatex(resumeData.TechStack.FrameworksAndPlatforms);
+    EscapeStringListForLatex(resumeData.TechStack.Databases);
+    EscapeStringListForLatex(resumeData.TechStack.CloudAndDevOps);
+    EscapeStringListForLatex(resumeData.TechStack.Others);
+
+    foreach (var experience in resumeData.Experience)
     {
-      var resumeJob = await _supabaseIntegration.FetchJobStatusAsync(jobId);
-
-      if (resumeJob is not null && resumeJob.Status != "pending" && resumeJob.Status != "processing")
+      experience.JobTitle = EscapeLatexReservedChars(experience.JobTitle);
+      experience.CompanyName = EscapeLatexReservedChars(experience.CompanyName);
+      experience.Location = EscapeLatexReservedChars(experience.Location);
+      experience.StartDate = EscapeLatexReservedChars(experience.StartDate);
+      if (experience.EndDate is not null)
       {
-        if (resumeJob.Status == "success") return (null, resumeJob.PdfUrl);
-        else return (resumeJob.Error, null);
+        experience.EndDate = EscapeLatexReservedChars(experience.EndDate);
       }
-      if (attempt < maxAttempts)
-      {
-        await Task.Delay(delay);
-      }
+      EscapeStringListForLatex(experience.Description);
     }
 
-    return ("Job timed out", null);
+    foreach (var project in resumeData.Projects)
+    {
+      project.DisplayName = EscapeLatexReservedChars(project.DisplayName);
+      project.ShortDescription = EscapeLatexReservedChars(project.ShortDescription);
+      project.LongDescription = EscapeLatexReservedChars(project.LongDescription);
+      project.RepoUrl = EscapeLatexReservedChars(project.RepoUrl);
+      project.LiveUrl = EscapeLatexReservedChars(project.LiveUrl);
+      EscapeStringListForLatex(project.TechStack);
+    }
   }
+
+  private static void EscapeStringListForLatex(List<string> values)
+  {
+    for (int i = 0; i < values.Count; i++)
+    {
+      values[i] = EscapeLatexReservedChars(values[i]);
+    }
+  }
+
+  private static string EscapeLatexReservedChars(string value)
+  {
+    return LatexReservedCharacterRegex.Replace(value, match => $@"\{match.Groups[1].Value}");
+  }
+
+  // public async Task<CreateResourceResponse<ResumeGenerationResponse>> GenerateResumeForJob(GenerateResumeForJobDto generateResumeForJobDto)
+  // {
+  //   var resumeData = ParseResumeDataJsonString(generateResumeForJobDto.ResumeData);
+  //   var templateId = generateResumeForJobDto.TemplateId;
+  //   var resumeName = generateResumeForJobDto.ResumeName;
+  //   var jobDescription = ReadJobDescription(generateResumeForJobDto.JobDescription);
+  //   var companyName = generateResumeForJobDto.CompanyName;
+  //   var projects = await _projectRepository.FetchAllAsync();
+  //   var fetchProjectDtos = _mapper.Map<List<FetchProjectDto>>(projects);
+
+  //   resumeData = await _aiIntegration.OptimiseForJobAsync(resumeData, fetchProjectDtos, jobDescription);
+
+  //   var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
+  //   var engine = ConfigureRazorLightEngine();
+  //   var result = await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
+  //   result = System.Net.WebUtility.HtmlDecode(result);
+  //   var pushedFileName = $"jd-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
+
+  //   await _githubIntegration.PushToRepositoryAsync($"docs/{pushedFileName}.tex", result!);
+
+  //   var jobId = await _supabaseIntegration.InsertJobStatusAsync(pushedFileName, companyName);
+
+  //   await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
+  //   await _telegramIntegration.SendWorkflowStartedMessageAsync();
+
+  //   return new CreateResourceResponse<ResumeGenerationResponse>(ResourceNames.Resume, new ResumeGenerationResponse
+  //   {
+  //     JobId = jobId,
+  //     ResumeName = resumeName,
+  //     LatexFileName = pushedFileName + ".tex"
+  //   });
+  // }
+
+  // private string ReadJobDescription(IFormFile jobDescriptionFile)
+  // {
+  //   using var reader = new StreamReader(jobDescriptionFile.OpenReadStream());
+  //   return reader.ReadToEnd();
+  // }
+
+  // private FetchResumeDto ParseResumeDataJsonString(string resumeDataJsonString)
+  // {
+  //   return JsonConvert.DeserializeObject<FetchResumeDto>(resumeDataJsonString) ?? new FetchResumeDto();
+  // }
+
+  // private async Task<(string? error, string? pdfUrl)> PollForJobStatus(long jobId)
+  // {
+  //   var maxAttempts = 20;
+  //   var delay = 30000;
+
+  //   for (int attempt = 0; attempt < maxAttempts; ++attempt)
+  //   {
+  //     var resumeJob = await _supabaseIntegration.FetchJobStatusAsync(jobId);
+
+  //     if (resumeJob is not null && resumeJob.Status != "pending" && resumeJob.Status != "processing")
+  //     {
+  //       if (resumeJob.Status == "success") return (null, resumeJob.PdfUrl);
+  //       else return (resumeJob.Error, null);
+  //     }
+  //     if (attempt < maxAttempts)
+  //     {
+  //       await Task.Delay(delay);
+  //     }
+  //   }
+
+  //   return ("Job timed out", null);
+  // }
 }

@@ -13,8 +13,6 @@ public interface IResumeService
 
   Task<CreateResourceResponse<ResumeGenerationResponse>> GenerateResume(GenerateResumeDto generateResumeDto);
 
-  Task<CreateResourceResponse<ResumeGenerationResponse>> GenerateResumeForJob(GenerateResumeForJobDto generateResumeForJobDto);
-
   Task<ResumeJobRunResponse> FetchResumeJobRunStatus(long jobId);
 
   Task<FetchResourceResponse<IDictionary<string, string>>> FetchLatestResumePdfUrl();
