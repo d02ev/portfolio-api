@@ -2,6 +2,8 @@ namespace Domain.Common;
 
 public static class SettingSectionNames
 {
+  public const string ApiKeySettings = "ApiKeySettings";
+
   public const string JwtSettings = "JwtSettings";
 
   public const string CorsSettings = "CorsSettings";

@@ -4,13 +4,23 @@ using Application.Mapping;
 using Domain.Common;
 using Domain.Configurations;
 using Infrastructure;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Serialization;
+using WebAPI.Authentication;
 using WebAPI.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("/etc/secrets/appsettings.Production.json", optional: true, reloadOnChange: false);
+
+const string ApiKeyScheme = "ApiKey";
+const string CombinedAuthScheme = "CombinedAuth";
+
+var configuredApiKeySettings = builder.Configuration.GetSection(SettingSectionNames.ApiKeySettings).Get<ApiKeySettings>() ?? new ApiKeySettings();
+var apiKeyHeaderName = string.IsNullOrWhiteSpace(configuredApiKeySettings.HeaderName)
+    ? "X-Api-Key"
+    : configuredApiKeySettings.HeaderName;
 
 builder.Services
     .AddMemoryCache()
@@ -18,6 +28,7 @@ builder.Services
     .AddTransient<ExceptionHandlingMiddleware>();
 
 builder.Services
+    .Configure<ApiKeySettings>(builder.Configuration.GetSection(SettingSectionNames.ApiKeySettings))
     .Configure<JwtSettings>(builder.Configuration.GetSection(SettingSectionNames.JwtSettings))
     .Configure<CorsSettings>(builder.Configuration.GetSection(SettingSectionNames.CorsSettings))
     .Configure<MongoDbSettings>(builder.Configuration.GetSection(SettingSectionNames.MongoDbSettings))
@@ -27,10 +38,23 @@ builder.Services
     .Configure<SupabaseSettings>(builder.Configuration.GetSection(SettingSectionNames.SupabaseSettings))
     .AddAuthentication(opts =>
     {
-        opts.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        opts.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        opts.DefaultAuthenticateScheme = CombinedAuthScheme;
+        opts.DefaultChallengeScheme = CombinedAuthScheme;
     })
-    .AddJwtBearer(opts =>
+    .AddPolicyScheme(CombinedAuthScheme, CombinedAuthScheme, opts =>
+    {
+        opts.ForwardDefaultSelector = context =>
+        {
+            if (context.Request.Headers.ContainsKey(apiKeyHeaderName))
+            {
+                return ApiKeyScheme;
+            }
+
+            return JwtBearerDefaults.AuthenticationScheme;
+        };
+    })
+    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyScheme, _ => {})
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, opts =>
     {
         var jwtSettings = builder.Configuration.GetSection(SettingSectionNames.JwtSettings).Get<JwtSettings>();
         opts.TokenValidationParameters = new TokenValidationParameters
