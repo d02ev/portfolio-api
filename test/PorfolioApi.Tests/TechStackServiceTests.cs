@@ -6,6 +6,7 @@ using Application.Services;
 using Domain.Entities;
 using Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace PorfolioApi.Tests;
@@ -18,7 +19,7 @@ public class TechStackServiceTests
   public TechStackServiceTests()
   {
     _techStackRepositoryMock = new Mock<ITechStackRepository>();
-    _techStackService = new TechStackService(_techStackRepositoryMock.Object, TestMapperFactory.Create());
+    _techStackService = new TechStackService(_techStackRepositoryMock.Object, TestMapperFactory.Create(), NullLogger<TechStackService>.Instance);
   }
 
   [Fact]

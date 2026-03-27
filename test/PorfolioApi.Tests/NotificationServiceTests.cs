@@ -2,19 +2,23 @@ using Application.Common;
 using Application.Integrations;
 using Application.Requests;
 using Application.Services;
+using FluentAssertions;
 using Moq;
+using Microsoft.Extensions.Logging;
 
 namespace PorfolioApi.Tests;
 
 public class NotificationServiceTests
 {
   private readonly Mock<ITelegramIntegration> _telegramIntegrationMock;
+  private readonly TestLogger<NotificationService> _logger;
   private readonly INotificationService _notificationService;
 
   public NotificationServiceTests()
   {
     _telegramIntegrationMock = new Mock<ITelegramIntegration>();
-    _notificationService = new NotificationService(_telegramIntegrationMock.Object);
+    _logger = new TestLogger<NotificationService>();
+    _notificationService = new NotificationService(_telegramIntegrationMock.Object, _logger);
   }
 
   [Fact]
@@ -26,6 +30,9 @@ public class NotificationServiceTests
     });
 
     _telegramIntegrationMock.Verify(t => t.SendInProgressMessageAsync(ResumeModes.Generic), Times.Once);
+    _logger.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("Started SendNotificationAsync"));
+    _logger.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("Dispatching in-progress notification"));
+    _logger.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("Completed SendNotificationAsync"));
   }
 
   [Fact]
@@ -38,6 +45,7 @@ public class NotificationServiceTests
     });
 
     _telegramIntegrationMock.Verify(t => t.SendFailureMessageAsync("Failed", ResumeModes.JobDescription), Times.Once);
+    _logger.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("Dispatching failure notification"));
   }
 
   [Fact]
@@ -51,5 +59,6 @@ public class NotificationServiceTests
     });
 
     _telegramIntegrationMock.Verify(t => t.SendSuccessMessageAsync("https://example.com/resume.pdf", "OpenAI", ResumeModes.JobDescription), Times.Once);
+    _logger.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("Dispatching success notification"));
   }
 }

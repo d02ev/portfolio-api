@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OpenAI;
 using OpenAI.Chat;
+using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Integrations;
 
@@ -19,9 +20,11 @@ public class AiIntegration : IAiIntegration
   private readonly AiSettings _aiSettings;
   private readonly ChatClient _client;
   private readonly ChatCompletionOptions _requestOptions;
+  private readonly ILogger<AiIntegration> _logger;
 
-  public AiIntegration(IOptions<AiSettings> options)
+  public AiIntegration(IOptions<AiSettings> options, ILogger<AiIntegration> logger)
   {
+    _logger = logger;
     _aiSettings = options.Value;
     _client = new ChatClient(_aiSettings.Model, new ApiKeyCredential(_aiSettings.PersonalAccessToken), new OpenAIClientOptions
     {
@@ -35,40 +38,62 @@ public class AiIntegration : IAiIntegration
 
   public async Task<FetchResumeDto> OptimiseForJobAsync(FetchResumeDto resumeData, List<FetchProjectDto> projects, string jobDescription)
   {
-    var originalResumeJson = JsonConvert.SerializeObject(resumeData);
-    var jobOptimisationPasses = GetJobOptimisationPasses();
-    var passCount = ResolvePassCount(_aiSettings.JobOptimisationPasses, DefaultJobOptimisationPasses, jobOptimisationPasses.Count);
+    _logger.LogInformation("Started {Operation}. ProjectCount={ProjectCount}.", nameof(OptimiseForJobAsync), projects.Count);
+    try
+    {
+      var originalResumeJson = JsonConvert.SerializeObject(resumeData);
+      var jobOptimisationPasses = GetJobOptimisationPasses();
+      var passCount = ResolvePassCount(_aiSettings.JobOptimisationPasses, DefaultJobOptimisationPasses, jobOptimisationPasses.Count);
 
-    var finalResumeJson = await RunOptimisationPassesAsync(
-      originalResumeJson,
-      [.. jobOptimisationPasses.Take(passCount)],
-      currentResumeJson => JsonConvert.SerializeObject(new
-      {
-        job_description = jobDescription,
-        original_resume = JToken.Parse(originalResumeJson),
-        current_resume = JToken.Parse(currentResumeJson),
-        projects_pool = JArray.FromObject(projects)
-      }));
+      var finalResumeJson = await RunOptimisationPassesAsync(
+        originalResumeJson,
+        [.. jobOptimisationPasses.Take(passCount)],
+        currentResumeJson => JsonConvert.SerializeObject(new
+        {
+          job_description = jobDescription,
+          original_resume = JToken.Parse(originalResumeJson),
+          current_resume = JToken.Parse(currentResumeJson),
+          projects_pool = JArray.FromObject(projects)
+        }));
 
-    return DeserializeResume(finalResumeJson);
+      var result = DeserializeResume(finalResumeJson);
+      _logger.LogInformation("Completed {Operation}.", nameof(OptimiseForJobAsync));
+      return result;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Failed {Operation}.", nameof(OptimiseForJobAsync));
+      throw;
+    }
   }
 
   public async Task<FetchResumeDto> OptimiseGenericAsync(FetchResumeDto resumeData)
   {
-    var originalResumeJson = JsonConvert.SerializeObject(resumeData);
-    var genericOptimisationPasses = GetGenericOptimisationPasses();
-    var passCount = ResolvePassCount(_aiSettings.GenericOptimisationPasses, DefaultGenericOptimisationPasses, genericOptimisationPasses.Count);
+    _logger.LogInformation("Started {Operation}.", nameof(OptimiseGenericAsync));
+    try
+    {
+      var originalResumeJson = JsonConvert.SerializeObject(resumeData);
+      var genericOptimisationPasses = GetGenericOptimisationPasses();
+      var passCount = ResolvePassCount(_aiSettings.GenericOptimisationPasses, DefaultGenericOptimisationPasses, genericOptimisationPasses.Count);
 
-    var finalResumeJson = await RunOptimisationPassesAsync(
-      originalResumeJson,
-      [.. genericOptimisationPasses.Take(passCount)],
-      currentResumeJson => JsonConvert.SerializeObject(new
-      {
-        original_resume = JToken.Parse(originalResumeJson),
-        current_resume = JToken.Parse(currentResumeJson)
-      }));
+      var finalResumeJson = await RunOptimisationPassesAsync(
+        originalResumeJson,
+        [.. genericOptimisationPasses.Take(passCount)],
+        currentResumeJson => JsonConvert.SerializeObject(new
+        {
+          original_resume = JToken.Parse(originalResumeJson),
+          current_resume = JToken.Parse(currentResumeJson)
+        }));
 
-    return DeserializeResume(finalResumeJson);
+      var result = DeserializeResume(finalResumeJson);
+      _logger.LogInformation("Completed {Operation}.", nameof(OptimiseGenericAsync));
+      return result;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Failed {Operation}.", nameof(OptimiseGenericAsync));
+      throw;
+    }
   }
 
   private async Task<string> RunOptimisationPassesAsync(string originalResumeJson, List<OptimisationPass> optimisationPasses, Func<string, string> createUserPrompt)
@@ -77,6 +102,7 @@ public class AiIntegration : IAiIntegration
 
     foreach (var optimisationPass in optimisationPasses)
     {
+      _logger.LogInformation("Running AI optimisation pass {PassName}.", optimisationPass.Name);
       currentResumeJson = await ExecuteOptimisationPassAsync(optimisationPass.SystemPrompt, createUserPrompt(currentResumeJson));
     }
 
@@ -85,14 +111,22 @@ public class AiIntegration : IAiIntegration
 
   private async Task<string> ExecuteOptimisationPassAsync(string systemPrompt, string userPrompt)
   {
-    var messages = new List<ChatMessage>()
+    try
     {
-      new SystemChatMessage(systemPrompt),
-      new UserChatMessage(userPrompt)
-    };
+      var messages = new List<ChatMessage>()
+      {
+        new SystemChatMessage(systemPrompt),
+        new UserChatMessage(userPrompt)
+      };
 
-    var response = await _client.CompleteChatAsync(messages, _requestOptions);
-    return CleanAndNormaliseJsonResponse(response.Value.Content[0].Text);
+      var response = await _client.CompleteChatAsync(messages, _requestOptions);
+      return CleanAndNormaliseJsonResponse(response.Value.Content[0].Text);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Failed {Operation}.", nameof(ExecuteOptimisationPassAsync));
+      throw;
+    }
   }
 
   private static FetchResumeDto DeserializeResume(string resumeJson)

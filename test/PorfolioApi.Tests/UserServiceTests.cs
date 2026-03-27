@@ -9,6 +9,7 @@ using Application.Services;
 using Domain.Entities;
 using Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Newtonsoft.Json;
 
@@ -24,7 +25,7 @@ public class UserServiceTests
   {
     _userRepositoryMock = new Mock<IUserRepository>();
     _authHelperMock = new Mock<IAuthHelper>();
-    _userService = new UserService(_userRepositoryMock.Object, _authHelperMock.Object);
+    _userService = new UserService(_userRepositoryMock.Object, _authHelperMock.Object, NullLogger<UserService>.Instance);
   }
 
   [Fact]

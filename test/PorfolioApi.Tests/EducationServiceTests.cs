@@ -6,6 +6,7 @@ using Application.Services;
 using Domain.Entities;
 using Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace PorfolioApi.Tests;
@@ -18,7 +19,7 @@ public class EducationServiceTests
   public EducationServiceTests()
   {
     _educationRepositoryMock = new Mock<IEducationRepository>();
-    _educationService = new EducationService(_educationRepositoryMock.Object, TestMapperFactory.Create());
+    _educationService = new EducationService(_educationRepositoryMock.Object, TestMapperFactory.Create(), NullLogger<EducationService>.Instance);
   }
 
   [Fact]
