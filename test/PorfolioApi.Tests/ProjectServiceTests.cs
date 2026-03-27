@@ -6,6 +6,7 @@ using Application.Services;
 using Domain.Entities;
 using Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace PorfolioApi.Tests;
@@ -18,7 +19,7 @@ public class ProjectServiceTests
   public ProjectServiceTests()
   {
     _projectRepositoryMock = new Mock<IProjectRepository>();
-    _projectService = new ProjectService(_projectRepositoryMock.Object, TestMapperFactory.Create());
+    _projectService = new ProjectService(_projectRepositoryMock.Object, TestMapperFactory.Create(), NullLogger<ProjectService>.Instance);
   }
 
   [Fact]

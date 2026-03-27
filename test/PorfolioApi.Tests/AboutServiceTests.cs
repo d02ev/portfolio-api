@@ -6,6 +6,7 @@ using Application.Services;
 using Domain.Entities;
 using Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace PorfolioApi.Tests;
@@ -20,7 +21,7 @@ public class AboutServiceTests
   {
     _aboutRepositoryMock = new Mock<IAboutRepository>();
     _techStackRepositoryMock = new Mock<ITechStackRepository>();
-    _aboutService = new AboutService(_aboutRepositoryMock.Object, _techStackRepositoryMock.Object, TestMapperFactory.Create());
+    _aboutService = new AboutService(_aboutRepositoryMock.Object, _techStackRepositoryMock.Object, TestMapperFactory.Create(), NullLogger<AboutService>.Instance);
   }
 
   [Fact]

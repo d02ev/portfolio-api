@@ -6,6 +6,7 @@ using Application.Services;
 using Domain.Entities;
 using Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace PorfolioApi.Tests;
@@ -18,7 +19,7 @@ public class ContactServiceTests
   public ContactServiceTests()
   {
     _contactRepositoryMock = new Mock<IContactRepository>();
-    _contactService = new ContactService(_contactRepositoryMock.Object, TestMapperFactory.Create());
+    _contactService = new ContactService(_contactRepositoryMock.Object, TestMapperFactory.Create(), NullLogger<ContactService>.Instance);
   }
 
   [Fact]

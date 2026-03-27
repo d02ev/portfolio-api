@@ -6,6 +6,7 @@ using Application.Services;
 using Domain.Entities;
 using Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace PorfolioApi.Tests;
@@ -18,7 +19,7 @@ public class ExperienceServiceTests
   public ExperienceServiceTests()
   {
     _experienceRepositoryMock = new Mock<IExperienceRepository>();
-    _experienceService = new ExperienceService(_experienceRepositoryMock.Object, TestMapperFactory.Create());
+    _experienceService = new ExperienceService(_experienceRepositoryMock.Object, TestMapperFactory.Create(), NullLogger<ExperienceService>.Instance);
   }
 
   [Fact]

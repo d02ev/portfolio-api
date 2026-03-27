@@ -8,6 +8,7 @@ using Domain.Entities;
 using Domain.Entities.Postgres;
 using Domain.Exceptions;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace PorfolioApi.Tests;
@@ -23,6 +24,7 @@ public class ResumeServiceTests
   private readonly Mock<ISupabaseIntegration> _supabaseIntegrationMock;
   private readonly Mock<ITelegramIntegration> _telegramIntegrationMock;
   private readonly Mock<IGithubIntegration> _githubIntegrationMock;
+  private readonly TestLogger<ResumeService> _logger;
   private readonly IResumeService _resumeService;
 
   public ResumeServiceTests()
@@ -36,6 +38,7 @@ public class ResumeServiceTests
     _supabaseIntegrationMock = new Mock<ISupabaseIntegration>();
     _telegramIntegrationMock = new Mock<ITelegramIntegration>();
     _githubIntegrationMock = new Mock<IGithubIntegration>();
+    _logger = new TestLogger<ResumeService>();
     _resumeService = new ResumeService(
       _resumeRepositoryMock.Object,
       _experienceRepositoryMock.Object,
@@ -46,7 +49,8 @@ public class ResumeServiceTests
       _supabaseIntegrationMock.Object,
       _telegramIntegrationMock.Object,
       _githubIntegrationMock.Object,
-      TestMapperFactory.Create());
+      TestMapperFactory.Create(),
+      _logger);
   }
 
   [Fact]
@@ -174,6 +178,9 @@ public class ResumeServiceTests
       It.Is<string>(content => content.Contains("Base Resume"))), Times.Once);
     _githubIntegrationMock.Verify(g => g.InitWorkflowAsync("42", "vikram-resume", response.Data.LatexFileName.Replace(".tex", string.Empty)), Times.Once);
     _telegramIntegrationMock.Verify(t => t.SendWorkflowStartedMessageAsync(), Times.Once);
+    _logger.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("Started GenerateResume"));
+    _logger.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("Downloading resume template"));
+    _logger.Entries.Should().Contain(e => e.Level == LogLevel.Information && e.Message.Contains("Completed GenerateResume"));
   }
 
   [Fact]

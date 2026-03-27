@@ -7,13 +7,14 @@ using Application.Responses;
 using AutoMapper;
 using Domain.Entities;
 using Domain.Exceptions;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using RazorLight;
 using System.Text.RegularExpressions;
 
 namespace Application.Services;
 
-public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration, IGithubIntegration githubIntegration, IMapper mapper) : IResumeService
+public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration, IGithubIntegration githubIntegration, IMapper mapper, ILogger<ResumeService> logger) : IResumeService
 {
   private static readonly Regex LatexReservedCharacterRegex = new(@"(?<!\\)([#%])", RegexOptions.Compiled);
   private readonly IResumeRepository _resumeRepository = resumeRepository;
@@ -27,110 +28,253 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
   // private readonly IAiIntegration _aiIntegration = aiIntegration;
   private readonly IGithubIntegration _githubIntegration = githubIntegration;
   private readonly IMapper _mapper = mapper;
+  private readonly ILogger<ResumeService> _logger = logger;
 
   public async Task<CreateResourceResponse> CreateResume(ResumeDto resumeDto)
   {
-    var _ = await _resumeRepository.FetchByNameAsync(resumeDto.Name);
-    if (_ is not null)
+    _logger.LogInformation("Started {Operation}. ResumeName={ResumeName}.", nameof(CreateResume), resumeDto.Name);
+    try
     {
-      throw new BadRequestException(ResourceNames.Resume, $"Resume with name {resumeDto.Name} already exists.");
+      var existingResume = await _resumeRepository.FetchByNameAsync(resumeDto.Name);
+      if (existingResume is not null)
+      {
+        _logger.LogWarning("Duplicate resume detected while creating resume.");
+        throw new BadRequestException(ResourceNames.Resume, $"Resume with name {resumeDto.Name} already exists.");
+      }
+
+      var resume = _mapper.Map<Resume>(resumeDto);
+      await _resumeRepository.CreateAsync(resume);
+
+      var newResume = await _resumeRepository.FetchByNameAsync(resumeDto.Name);
+      if (newResume is null)
+      {
+        throw new InternalServerException(ResourceNames.Resume, "An error occurred while creating the resume.");
+      }
+
+      _logger.LogInformation("Completed {Operation}. ResourceName={ResourceName}.", nameof(CreateResume), ResourceNames.Resume);
+      return new CreateResourceResponse(ResourceNames.Resume);
     }
-
-    var resume = _mapper.Map<Resume>(resumeDto);
-    await _resumeRepository.CreateAsync(resume);
-
-    var newResume = await _resumeRepository.FetchByNameAsync(resumeDto.Name) ?? throw new InternalServerException(ResourceNames.Resume, "An error occurred while creating the resume.");
-
-    return new CreateResourceResponse(ResourceNames.Resume);
+    catch (BadRequestException)
+    {
+      throw;
+    }
+    catch (InternalServerException)
+    {
+      throw;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Unexpected error in {Operation}. ResumeName={ResumeName}.", nameof(CreateResume), resumeDto.Name);
+      throw;
+    }
   }
 
   public async Task<FetchResourceResponse<FetchResumeDto>> FetchResume()
   {
-    var resume = await _resumeRepository.FetchAsync() ?? throw new NotFoundException(ResourceNames.Resume);
-    var projectTask = _projectRepository.FetchByIdsAsync(resume.ProjectIds);
-    var techStackTask = _techStackRepository.FetchByIdAsync(resume.TechStackId);
-    var educationTask = _educationRepository.FetchByIdAsync(resume.EducationId);
-    var contactTask = _contactRepository.FetchByIdAsync(resume.ContactId);
+    _logger.LogInformation("Started {Operation}.", nameof(FetchResume));
+    try
+    {
+      var resume = await _resumeRepository.FetchAsync();
+      if (resume is null)
+      {
+        _logger.LogWarning("Resume not found.");
+        throw new NotFoundException(ResourceNames.Resume);
+      }
 
-    await Task.WhenAll(projectTask, techStackTask, educationTask, contactTask);
+      var projectTask = _projectRepository.FetchByIdsAsync(resume.ProjectIds);
+      var techStackTask = _techStackRepository.FetchByIdAsync(resume.TechStackId);
+      var educationTask = _educationRepository.FetchByIdAsync(resume.EducationId);
+      var contactTask = _contactRepository.FetchByIdAsync(resume.ContactId);
 
-    var experiences = await _experienceRepository.FetchByIdsAsync(resume.ExperienceIds);
-    experiences = [.. experiences.OrderByDescending(e => e?.StartDate)];
+      await Task.WhenAll(projectTask, techStackTask, educationTask, contactTask);
 
-    var projects = projectTask.Result;
-    var techStack = techStackTask.Result;
-    var education = educationTask.Result;
-    var contact = contactTask.Result;
+      var experiences = await _experienceRepository.FetchByIdsAsync(resume.ExperienceIds);
+      experiences = [.. experiences.OrderByDescending(e => e?.StartDate)];
 
-    var fetchResumeDto = _mapper.Map<FetchResumeDto>(resume);
-    fetchResumeDto.Projects = _mapper.Map<List<FetchProjectDto>>(projects);
-    fetchResumeDto.Experience = _mapper.Map<List<FetchExperienceDto>>(experiences);
-    fetchResumeDto.TechStack = _mapper.Map<FetchTechStackDto>(techStack);
-    fetchResumeDto.Contact = _mapper.Map<FetchContactDto>(contact);
-    fetchResumeDto.Education = _mapper.Map<FetchEducationDto>(education);
+      var projects = projectTask.Result;
+      var techStack = techStackTask.Result;
+      var education = educationTask.Result;
+      var contact = contactTask.Result;
 
-    return new FetchResourceResponse<FetchResumeDto>(ResourceNames.Resume, fetchResumeDto);
+      var fetchResumeDto = _mapper.Map<FetchResumeDto>(resume);
+      fetchResumeDto.Projects = _mapper.Map<List<FetchProjectDto>>(projects);
+      fetchResumeDto.Experience = _mapper.Map<List<FetchExperienceDto>>(experiences);
+      fetchResumeDto.TechStack = _mapper.Map<FetchTechStackDto>(techStack);
+      fetchResumeDto.Contact = _mapper.Map<FetchContactDto>(contact);
+      fetchResumeDto.Education = _mapper.Map<FetchEducationDto>(education);
+
+      _logger.LogInformation("Completed {Operation}.", nameof(FetchResume));
+      return new FetchResourceResponse<FetchResumeDto>(ResourceNames.Resume, fetchResumeDto);
+    }
+    catch (NotFoundException)
+    {
+      throw;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Unexpected error in {Operation}.", nameof(FetchResume));
+      throw;
+    }
   }
 
   public async Task<UpdateResourceResponse<IDictionary<string, object>>> UpdateResume(string resumeId, UpdateResumeDto updateResumeDto)
   {
-    var _ = await _resumeRepository.FetchByIdAsync(resumeId) ?? throw new NotFoundException(ResourceNames.Resume, resumeId);
-    var changes = UpdateObjectBuilderHelper.BuildUpdateObject<UpdateResumeDto>(updateResumeDto);
-    var serializedChanges = JsonConvert.SerializeObject(changes);
+    _logger.LogInformation("Started {Operation} for ResumeId={ResumeId}.", nameof(UpdateResume), resumeId);
+    try
+    {
+      var existingResume = await _resumeRepository.FetchByIdAsync(resumeId);
+      if (existingResume is null)
+      {
+        _logger.LogWarning("Resume not found for update. ResumeId={ResumeId}.", resumeId);
+        throw new NotFoundException(ResourceNames.Resume, resumeId);
+      }
 
-    await _resumeRepository.UpdateAsync(resumeId, serializedChanges);
-    return new UpdateResourceResponse<IDictionary<string, object>>(ResourceNames.Resume, changes);
+      var changes = UpdateObjectBuilderHelper.BuildUpdateObject<UpdateResumeDto>(updateResumeDto);
+      var serializedChanges = JsonConvert.SerializeObject(changes);
+
+      await _resumeRepository.UpdateAsync(resumeId, serializedChanges);
+      _logger.LogInformation("Completed {Operation} for ResumeId={ResumeId}.", nameof(UpdateResume), resumeId);
+      return new UpdateResourceResponse<IDictionary<string, object>>(ResourceNames.Resume, changes);
+    }
+    catch (NotFoundException)
+    {
+      throw;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Unexpected error in {Operation} for ResumeId={ResumeId}.", nameof(UpdateResume), resumeId);
+      throw;
+    }
   }
 
   public async Task<CreateResourceResponse<ResumeGenerationResponse>> GenerateResume(GenerateResumeDto generateResumeDto)
   {
-    var resumeData = generateResumeDto.ResumeData;
     var templateId = generateResumeDto.TemplateId;
     var resumeName = generateResumeDto.ResumeName;
     var companyName = generateResumeDto.CompanyName;
 
-    // resumeData = await _aiIntegration.OptimiseGenericAsync(resumeData);
-    EscapeResumeDataForLatex(resumeData);
+    _logger.LogInformation(
+      "Started {Operation}. TemplateId={TemplateId}, ResumeName={ResumeName}, HasCompanyName={HasCompanyName}.",
+      nameof(GenerateResume),
+      templateId,
+      resumeName,
+      !string.IsNullOrWhiteSpace(companyName));
 
-    var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
-    var engine = ConfigureRazorLightEngine();
-    var result = await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
-    result = System.Net.WebUtility.HtmlDecode(result);
-    var pushedFileName = companyName is null ? $"ge-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}" : $"jd-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
-
-    await _githubIntegration.PushToRepositoryAsync($"docs/{pushedFileName}.tex", result!);
-
-    var jobId = await _supabaseIntegration.InsertJobStatusAsync(pushedFileName);
-
-    await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
-    await _telegramIntegration.SendWorkflowStartedMessageAsync();
-
-    return new CreateResourceResponse<ResumeGenerationResponse>(ResourceNames.Resume, new ResumeGenerationResponse
+    try
     {
-      JobId = jobId,
-      ResumeName = resumeName,
-      LatexFileName = pushedFileName + ".tex"
-    });
+      var resumeData = generateResumeDto.ResumeData;
+
+      // resumeData = await _aiIntegration.OptimiseGenericAsync(resumeData);
+      EscapeResumeDataForLatex(resumeData);
+      _logger.LogInformation("Escaped resume data for LaTeX in {Operation}.", nameof(GenerateResume));
+
+      _logger.LogInformation("Downloading resume template. TemplateId={TemplateId}.", templateId);
+      var template = await _supabaseIntegration.DownloadFileAsStringAsync(templateId);
+
+      _logger.LogInformation("Rendering resume template for ResumeName={ResumeName}.", resumeName);
+      var engine = ConfigureRazorLightEngine();
+      var result = await engine.CompileRenderStringAsync("ResumeTemplate", template, resumeData);
+      result = System.Net.WebUtility.HtmlDecode(result);
+      var pushedFileName = companyName is null ? $"ge-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}" : $"jd-{Guid.NewGuid()}-{DateTime.UtcNow:yyyyMMdd}";
+      var latexFilePath = $"docs/{pushedFileName}.tex";
+
+      _logger.LogInformation("Pushing rendered LaTeX to repository. FilePath={FilePath}.", latexFilePath);
+      await _githubIntegration.PushToRepositoryAsync(latexFilePath, result!);
+
+      _logger.LogInformation("Inserting resume job status for LatexFileName={LatexFileName}.", pushedFileName);
+      var jobId = await _supabaseIntegration.InsertJobStatusAsync(pushedFileName);
+      _logger.LogInformation("Inserted resume job status. JobId={JobId}.", jobId);
+
+      _logger.LogInformation("Initializing workflow dispatch for JobId={JobId}.", jobId);
+      await _githubIntegration.InitWorkflowAsync(jobId.ToString(), resumeName, pushedFileName);
+
+      _logger.LogInformation("Sending workflow started notification for JobId={JobId}.", jobId);
+      await _telegramIntegration.SendWorkflowStartedMessageAsync();
+
+      _logger.LogInformation("Completed {Operation}. JobId={JobId}, LatexFileName={LatexFileName}.", nameof(GenerateResume), jobId, pushedFileName + ".tex");
+      return new CreateResourceResponse<ResumeGenerationResponse>(ResourceNames.Resume, new ResumeGenerationResponse
+      {
+        JobId = jobId,
+        ResumeName = resumeName,
+        LatexFileName = pushedFileName + ".tex"
+      });
+    }
+    catch (BadRequestException)
+    {
+      throw;
+    }
+    catch (NotFoundException)
+    {
+      throw;
+    }
+    catch (InternalServerException)
+    {
+      throw;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(
+        ex,
+        "Unexpected error in {Operation}. TemplateId={TemplateId}, ResumeName={ResumeName}.",
+        nameof(GenerateResume),
+        templateId,
+        resumeName);
+      throw;
+    }
   }
 
   public async Task<ResumeJobRunResponse> FetchResumeJobRunStatus(long jobId)
   {
-    var resumeJob = await _supabaseIntegration.FetchJobStatusAsync(jobId) ?? throw new NotFoundException("ResumeJobRun", jobId);
-    return new ResumeJobRunResponse
+    _logger.LogInformation("Started {Operation} for JobId={JobId}.", nameof(FetchResumeJobRunStatus), jobId);
+    try
     {
-      Status = resumeJob.Status,
-      PdfUrl = resumeJob.PdfUrl,
-      Error = resumeJob.Error,
-    };
+      var resumeJob = await _supabaseIntegration.FetchJobStatusAsync(jobId);
+      if (resumeJob is null)
+      {
+        _logger.LogWarning("Resume job run not found for JobId={JobId}.", jobId);
+        throw new NotFoundException("ResumeJobRun", jobId);
+      }
+
+      _logger.LogInformation("Completed {Operation} for JobId={JobId}. Status={Status}.", nameof(FetchResumeJobRunStatus), jobId, resumeJob.Status);
+      return new ResumeJobRunResponse
+      {
+        Status = resumeJob.Status,
+        PdfUrl = resumeJob.PdfUrl,
+        Error = resumeJob.Error,
+      };
+    }
+    catch (NotFoundException)
+    {
+      throw;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Unexpected error in {Operation} for JobId={JobId}.", nameof(FetchResumeJobRunStatus), jobId);
+      throw;
+    }
   }
 
   public async Task<FetchResourceResponse<IDictionary<string, string>>> FetchLatestResumePdfUrl()
   {
-    var result = await _supabaseIntegration.FetchLatestPdfUrlAsync();
-    return new FetchResourceResponse<IDictionary<string, string>>("ResumePdfUrl", new Dictionary<string, string>
+    _logger.LogInformation("Started {Operation}.", nameof(FetchLatestResumePdfUrl));
+    try
     {
-      ["pdfUrl"] = result ?? string.Empty,
-    });
+      var result = await _supabaseIntegration.FetchLatestPdfUrlAsync();
+      _logger.LogInformation("Completed {Operation}. HasPdfUrl={HasPdfUrl}.", nameof(FetchLatestResumePdfUrl), !string.IsNullOrWhiteSpace(result));
+      return new FetchResourceResponse<IDictionary<string, string>>("ResumePdfUrl", new Dictionary<string, string>
+      {
+        ["pdfUrl"] = result ?? string.Empty,
+      });
+    }
+    catch (NotFoundException)
+    {
+      throw;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogError(ex, "Unexpected error in {Operation}.", nameof(FetchLatestResumePdfUrl));
+      throw;
+    }
   }
 
   private static RazorLightEngine ConfigureRazorLightEngine()

@@ -25,22 +25,26 @@ public class ApiKeyAuthenticationHandler(
 
     if (string.IsNullOrWhiteSpace(_apiKeySettings.Key))
     {
+      Logger.LogError("API key authentication configuration is missing.");
       return Task.FromResult(AuthenticateResult.Fail("API key authentication is not configured."));
     }
 
     if (!Request.Headers.TryGetValue(headerName, out var headerValues))
     {
+      Logger.LogDebug("API key header not found. Falling back to other authentication schemes.");
       return Task.FromResult(AuthenticateResult.NoResult());
     }
 
     var providedApiKey = headerValues.ToString();
     if (string.IsNullOrWhiteSpace(providedApiKey))
     {
+      Logger.LogWarning("API key header provided but empty.");
       return Task.FromResult(AuthenticateResult.Fail("API key is missing."));
     }
 
     if (!KeysMatch(providedApiKey, _apiKeySettings.Key))
     {
+      Logger.LogWarning("API key authentication failed due to invalid key.");
       return Task.FromResult(AuthenticateResult.Fail("API key is invalid."));
     }
 
@@ -54,6 +58,7 @@ public class ApiKeyAuthenticationHandler(
     var principal = new ClaimsPrincipal(identity);
     var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
+    Logger.LogInformation("API key authentication succeeded.");
     return Task.FromResult(AuthenticateResult.Success(ticket));
   }
 
