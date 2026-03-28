@@ -182,7 +182,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
       await _githubIntegration.PushToRepositoryAsync(latexFilePath, result!);
 
       _logger.LogInformation("Inserting resume job status for LatexFileName={LatexFileName}.", pushedFileName);
-      var jobId = await _supabaseIntegration.InsertJobStatusAsync(pushedFileName);
+      var jobId = await _supabaseIntegration.InsertJobStatusAsync(pushedFileName, companyName);
       _logger.LogInformation("Inserted resume job status. JobId={JobId}.", jobId);
 
       _logger.LogInformation("Initializing workflow dispatch for JobId={JobId}.", jobId);
