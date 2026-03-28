@@ -76,7 +76,7 @@ public class SupabaseIntegration : ISupabaseIntegration
     _logger.LogInformation("Started {Operation}. LatexFileName={LatexFileName}, HasCompanyName={HasCompanyName}.", nameof(InsertJobStatusAsync), latexFileName, !string.IsNullOrWhiteSpace(companyName));
     try
     {
-      var newResumeJobEntry = await _client.From<ResumeJob>().Insert(new ResumeJob { Status = "pending",  LatexFileName = latexFileName, CompanyName = companyName }, new QueryOptions { Returning = QueryOptions.ReturnType.Representation });
+      var newResumeJobEntry = await _client.From<ResumeJob>().Insert(new ResumeJob { Status = "pending",  LatexFileName = latexFileName, CompanyName = companyName, Mode = companyName is not null ? "job_description" : "generic" }, new QueryOptions { Returning = QueryOptions.ReturnType.Representation });
       var jobId = newResumeJobEntry.Models.First().Id;
       _logger.LogInformation("Completed {Operation}. JobId={JobId}.", nameof(InsertJobStatusAsync), jobId);
       return jobId;
