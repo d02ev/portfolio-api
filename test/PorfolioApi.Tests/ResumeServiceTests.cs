@@ -311,7 +311,7 @@ public class ResumeServiceTests
 
     _supabaseIntegrationMock.Setup(s => s.DownloadFileAsStringAsync("template-1"))
       .ReturnsAsync("Hello @Model.Name");
-    _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), null))
+    _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), "OpenAI"))
       .ReturnsAsync(87);
 
     var response = await _resumeService.GenerateResume(request);
@@ -322,6 +322,9 @@ public class ResumeServiceTests
     _githubIntegrationMock.Verify(g => g.PushToRepositoryAsync(
       $"docs/{response.Data.LatexFileName}",
       It.Is<string>(content => content.Contains("Company Resume"))), Times.Once);
+    _supabaseIntegrationMock.Verify(s => s.InsertJobStatusAsync(
+      It.Is<string>(fileName => fileName.StartsWith("jd-")),
+      "OpenAI"), Times.Once);
     _githubIntegrationMock.Verify(g => g.InitWorkflowAsync("87", "vikram-job", response.Data.LatexFileName.Replace(".tex", string.Empty)), Times.Once);
     _telegramIntegrationMock.Verify(t => t.SendWorkflowStartedMessageAsync(), Times.Once);
   }
