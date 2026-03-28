@@ -59,7 +59,7 @@ public class FetchProjectDto
   public string RepoUrl { get; set; } = string.Empty;
 
   [JsonProperty("liveUrl")]
-  public string LiveUrl { get; set; } = string.Empty;
+  public string? LiveUrl { get; set; } = string.Empty;
 }
 
 public class UpdateProjectDto
