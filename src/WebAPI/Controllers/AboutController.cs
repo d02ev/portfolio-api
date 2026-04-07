@@ -23,7 +23,6 @@ public class AboutController(IAboutService aboutService, ILogger<AboutController
     return CreatedAtAction(nameof(Create), result);
   }
 
-  [AllowAnonymous]
   [HttpGet]
   public async Task<IActionResult> GetAll()
   {

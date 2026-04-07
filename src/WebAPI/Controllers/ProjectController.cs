@@ -23,7 +23,6 @@ public class ProjectController(IProjectService projectService, ILogger<ProjectCo
     return CreatedAtAction(nameof(Create), result);
   }
 
-  [AllowAnonymous]
   [HttpGet]
   public async Task<IActionResult> GetAll()
   {
