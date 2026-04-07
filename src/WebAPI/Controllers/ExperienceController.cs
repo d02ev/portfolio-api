@@ -23,7 +23,6 @@ public class ExperienceController(IExperienceService experienceService, ILogger<
     return CreatedAtAction(nameof(Create), result);
   }
 
-  [AllowAnonymous]
   [HttpGet]
   public async Task<IActionResult> GetAll()
   {

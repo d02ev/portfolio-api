@@ -64,7 +64,6 @@ public class ResumeController(IResumeService resumeService, ILogger<ResumeContro
     return Ok(result);
   }
 
-  [AllowAnonymous]
   [HttpGet("latest")]
   public async Task<IActionResult> GetLatestResume()
   {
