@@ -88,6 +88,7 @@ public class MappingProfile : Profile
     CreateMap<Resume, ResumeDto>()
       .ReverseMap();
     CreateMap<Resume, FetchResumeDto>()
+      .ForMember(r => r.ProfessionalSummary, opts => opts.Ignore())
       .ForMember(r => r.Contact, opts => opts.Ignore())
       .ForMember(r => r.Education, opts => opts.Ignore())
       .ForMember(r => r.Experience, opts => opts.Ignore())

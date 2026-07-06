@@ -31,6 +31,7 @@ public class AboutServiceTests
     {
       TechStackId = "tech-1",
       FunFact = "Fun fact",
+      ProfessionalSummary = "Backend engineer building reliable systems.",
       Bio = new BioDto
       {
         Name = "Vikram",
@@ -53,6 +54,7 @@ public class AboutServiceTests
     _aboutRepositoryMock.Verify(r => r.CreateAsync(It.Is<About>(a =>
       a.TechStackId == aboutDto.TechStackId &&
       a.FunFact == aboutDto.FunFact &&
+      a.ProfessionalSummary == aboutDto.ProfessionalSummary &&
       a.Bio.Name == aboutDto.Bio.Name &&
       a.Bio.Company == aboutDto.Bio.Company &&
       a.Bio.Highlights.Single().Text == aboutDto.Bio.Highlights.Single().Text
@@ -107,6 +109,7 @@ public class AboutServiceTests
       Id = "about-1",
       TechStackId = "tech-1",
       FunFact = "Fun fact",
+      ProfessionalSummary = "Backend engineer building reliable systems.",
       Bio = new Bio
       {
         Name = "Vikram",
@@ -134,6 +137,7 @@ public class AboutServiceTests
     response.ResourceName.Should().Be(ResourceNames.About);
     response.Data.Id.Should().Be(about.Id);
     response.Data.Bio.Name.Should().Be(about.Bio.Name);
+    response.Data.ProfessionalSummary.Should().Be(about.ProfessionalSummary);
     response.Data.TechStack.Languages.Should().ContainSingle().Which.Should().Be("C#");
   }
 
@@ -171,6 +175,7 @@ public class AboutServiceTests
     var updateAboutDto = new UpdateAboutDto
     {
       FunFact = "Updated fact",
+      ProfessionalSummary = "Updated professional summary",
       Bio = new UpdateBioDto
       {
         Company = "OpenAI"
@@ -179,10 +184,13 @@ public class AboutServiceTests
 
     var response = await _aboutService.UpdateAbout("about-1", updateAboutDto);
 
-    response.Data.Keys.Should().BeEquivalentTo(["Bio", "FunFact"]);
+    response.Data.Keys.Should().BeEquivalentTo(["Bio", "FunFact", "ProfessionalSummary"]);
     ((UpdateBioDto)response.Data["Bio"]).Company.Should().Be("OpenAI");
     response.Data["FunFact"].Should().Be("Updated fact");
+    response.Data["ProfessionalSummary"].Should().Be("Updated professional summary");
     _aboutRepositoryMock.Verify(r => r.UpdateAsync("about-1", It.Is<string>(s =>
-      s.Contains("Updated fact") && s.Contains("OpenAI"))), Times.Once);
+      s.Contains("Updated fact") &&
+      s.Contains("Updated professional summary") &&
+      s.Contains("OpenAI"))), Times.Once);
   }
 }

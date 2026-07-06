@@ -13,6 +13,9 @@ public class AboutDto
 
   [JsonProperty("funFact")]
   public string FunFact { get; set; } = string.Empty;
+
+  [JsonProperty("professionalSummary")]
+  public string? ProfessionalSummary { get; set; } = null;
 }
 
 public class BioDto
@@ -56,6 +59,9 @@ public class FetchAboutDto
   [JsonProperty("funFact")]
   public string FunFact { get; set; } = string.Empty;
 
+  [JsonProperty("professionalSummary")]
+  public string? ProfessionalSummary { get; set; } = null;
+
   [JsonProperty("techStack")]
   public FetchTechStackDto TechStack { get; set; } = new FetchTechStackDto();
 }
@@ -67,6 +73,9 @@ public class UpdateAboutDto
 
   [JsonProperty("funFact")]
   public string? FunFact { get; set; } = null;
+
+  [JsonProperty("professionalSummary")]
+  public string? ProfessionalSummary { get; set; } = null;
 }
 
 public class UpdateBioDto

@@ -14,7 +14,7 @@ using System.Text.RegularExpressions;
 
 namespace Application.Services;
 
-public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration, IGithubIntegration githubIntegration, IMapper mapper, ILogger<ResumeService> logger) : IResumeService
+public class ResumeService(IResumeRepository resumeRepository, IExperienceRepository experienceRepository, IProjectRepository projectRepository, ITechStackRepository techStackRepository, IEducationRepository educationRepository, IContactRepository contactRepository, IAboutRepository aboutRepository, ISupabaseIntegration supabaseIntegration, ITelegramIntegration telegramIntegration, IGithubIntegration githubIntegration, IMapper mapper, ILogger<ResumeService> logger) : IResumeService
 {
   private static readonly Regex LatexReservedCharacterRegex = new(@"(?<!\\)([#%])", RegexOptions.Compiled);
   private readonly IResumeRepository _resumeRepository = resumeRepository;
@@ -23,6 +23,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
   private readonly ITechStackRepository _techStackRepository = techStackRepository;
   private readonly IEducationRepository _educationRepository = educationRepository;
   private readonly IContactRepository _contactRepository = contactRepository;
+  private readonly IAboutRepository _aboutRepository = aboutRepository;
   private readonly ISupabaseIntegration _supabaseIntegration = supabaseIntegration;
   private readonly ITelegramIntegration _telegramIntegration = telegramIntegration;
   // private readonly IAiIntegration _aiIntegration = aiIntegration;
@@ -85,8 +86,9 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
       var techStackTask = _techStackRepository.FetchByIdAsync(resume.TechStackId);
       var educationTask = _educationRepository.FetchByIdAsync(resume.EducationId);
       var contactTask = _contactRepository.FetchByIdAsync(resume.ContactId);
+      var aboutTask = _aboutRepository.FetchAsync();
 
-      await Task.WhenAll(projectTask, techStackTask, educationTask, contactTask);
+      await Task.WhenAll(projectTask, techStackTask, educationTask, contactTask, aboutTask);
 
       var experiences = await _experienceRepository.FetchByIdsAsync(resume.ExperienceIds);
       experiences = [.. experiences.OrderByDescending(e => e?.StartDate)];
@@ -95,8 +97,10 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
       var techStack = techStackTask.Result;
       var education = educationTask.Result;
       var contact = contactTask.Result;
+      var about = aboutTask.Result;
 
       var fetchResumeDto = _mapper.Map<FetchResumeDto>(resume);
+      fetchResumeDto.ProfessionalSummary = about?.ProfessionalSummary;
       fetchResumeDto.Projects = _mapper.Map<List<FetchProjectDto>>(projects);
       fetchResumeDto.Experience = _mapper.Map<List<FetchExperienceDto>>(experiences);
       fetchResumeDto.TechStack = _mapper.Map<FetchTechStackDto>(techStack);
@@ -288,6 +292,10 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
   private static void EscapeResumeDataForLatex(FetchResumeDto resumeData)
   {
     resumeData.Name = EscapeLatexReservedChars(resumeData.Name);
+    if (resumeData.ProfessionalSummary is not null)
+    {
+      resumeData.ProfessionalSummary = EscapeLatexReservedChars(resumeData.ProfessionalSummary);
+    }
 
     resumeData.Contact.Email = EscapeLatexReservedChars(resumeData.Contact.Email);
     resumeData.Contact.Mobile = EscapeLatexReservedChars(resumeData.Contact.Mobile);

@@ -32,6 +32,9 @@ public class FetchResumeDto
   [JsonProperty("name")]
   public string Name { get; set; } = string.Empty;
 
+  [JsonProperty("professionalSummary")]
+  public string? ProfessionalSummary { get; set; } = null;
+
   [JsonProperty("contact")]
   public FetchContactDto Contact { get; set; } = new FetchContactDto();
 

@@ -18,6 +18,10 @@ public class About : BaseEntity
   [BsonRepresentation(BsonType.String)]
   [BsonRequired]
   public string FunFact { get; set; } = string.Empty;
+
+  [BsonElement("professionalSummary")]
+  [BsonRepresentation(BsonType.String)]
+  public string? ProfessionalSummary { get; set; } = null;
 }
 
 public class Bio

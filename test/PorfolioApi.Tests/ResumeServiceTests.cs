@@ -21,6 +21,7 @@ public class ResumeServiceTests
   private readonly Mock<ITechStackRepository> _techStackRepositoryMock;
   private readonly Mock<IEducationRepository> _educationRepositoryMock;
   private readonly Mock<IContactRepository> _contactRepositoryMock;
+  private readonly Mock<IAboutRepository> _aboutRepositoryMock;
   private readonly Mock<ISupabaseIntegration> _supabaseIntegrationMock;
   private readonly Mock<ITelegramIntegration> _telegramIntegrationMock;
   private readonly Mock<IGithubIntegration> _githubIntegrationMock;
@@ -35,6 +36,7 @@ public class ResumeServiceTests
     _techStackRepositoryMock = new Mock<ITechStackRepository>();
     _educationRepositoryMock = new Mock<IEducationRepository>();
     _contactRepositoryMock = new Mock<IContactRepository>();
+    _aboutRepositoryMock = new Mock<IAboutRepository>();
     _supabaseIntegrationMock = new Mock<ISupabaseIntegration>();
     _telegramIntegrationMock = new Mock<ITelegramIntegration>();
     _githubIntegrationMock = new Mock<IGithubIntegration>();
@@ -46,6 +48,7 @@ public class ResumeServiceTests
       _techStackRepositoryMock.Object,
       _educationRepositoryMock.Object,
       _contactRepositoryMock.Object,
+      _aboutRepositoryMock.Object,
       _supabaseIntegrationMock.Object,
       _telegramIntegrationMock.Object,
       _githubIntegrationMock.Object,
@@ -94,8 +97,12 @@ public class ResumeServiceTests
                    ex.StatusCode == (int)HttpStatusCode.BadRequest);
   }
 
-  [Fact]
-  public async Task FetchResume_ShouldReturnFullyComposedResumeAndSortExperienceDescending()
+  [Theory]
+  [InlineData(true, "Backend engineer building reliable systems.")]
+  [InlineData(false, null)]
+  public async Task FetchResume_ShouldReturnFullyComposedResumeAndSortExperienceDescending(
+    bool hasAbout,
+    string? expectedProfessionalSummary)
   {
     _resumeRepositoryMock.Setup(r => r.FetchAsync())
       .ReturnsAsync(new Resume
@@ -116,6 +123,10 @@ public class ResumeServiceTests
       .ReturnsAsync(new Education { Id = "education-1", Institute = "BITS" });
     _contactRepositoryMock.Setup(r => r.FetchByIdAsync("contact-1"))
       .ReturnsAsync(new Contact { Id = "contact-1", Email = "vikram@example.com" });
+    _aboutRepositoryMock.Setup(r => r.FetchAsync())
+      .ReturnsAsync(hasAbout
+        ? new About { Id = "about-1", ProfessionalSummary = expectedProfessionalSummary }
+        : null);
     _experienceRepositoryMock.Setup(r => r.FetchByIdsAsync(It.IsAny<IList<string>>()))
       .ReturnsAsync([
         new Experience { Id = "exp-1", CompanyName = "Older", JobTitle = "Developer", StartDate = new DateTime(2023, 1, 16) },
@@ -125,6 +136,7 @@ public class ResumeServiceTests
     var response = await _resumeService.FetchResume();
 
     response.Data.Name.Should().Be("default");
+    response.Data.ProfessionalSummary.Should().Be(expectedProfessionalSummary);
     response.Data.Contact.Email.Should().Be("vikram@example.com");
     response.Data.TechStack.Languages.Should().ContainSingle().Which.Should().Be("C#");
     response.Data.Projects.Should().ContainSingle().Which.DisplayName.Should().Be("Portfolio API");
@@ -191,6 +203,7 @@ public class ResumeServiceTests
       ResumeData = new FetchResumeDto
       {
         Name = "Name #% ",
+        ProfessionalSummary = "Summary #% ",
         Contact = new FetchContactDto
         {
           Email = "user#%mail.com",
@@ -246,7 +259,7 @@ public class ResumeServiceTests
     };
 
     _supabaseIntegrationMock.Setup(s => s.DownloadFileAsStringAsync("template-1"))
-      .ReturnsAsync("@Model.Name|@Model.Contact.Email|@Model.Education.Degree|@Model.TechStack.Languages[0]|@Model.Experience[0].Description[0]|@Model.Projects[0].DisplayName|@Model.Projects[0].TechStack[0]|@Model.Projects[0].LongDescription|@Model.Projects[0].RepoUrl");
+      .ReturnsAsync("@Model.Name|@Model.ProfessionalSummary|@Model.Contact.Email|@Model.Education.Degree|@Model.TechStack.Languages[0]|@Model.Experience[0].Description[0]|@Model.Projects[0].DisplayName|@Model.Projects[0].TechStack[0]|@Model.Projects[0].LongDescription|@Model.Projects[0].RepoUrl");
     _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), null))
       .ReturnsAsync(55);
 
@@ -256,6 +269,7 @@ public class ResumeServiceTests
       It.IsAny<string>(),
       It.Is<string>(content =>
         content.Contains(@"Name \#\% ") &&
+        content.Contains(@"Summary \#\% ") &&
         content.Contains(@"user\#\%mail.com") &&
         content.Contains(@"B.Tech\#\%") &&
         content.Contains(@"C\#\%") &&
@@ -273,14 +287,15 @@ public class ResumeServiceTests
     {
       ResumeData = new FetchResumeDto
       {
-        Name = @"Value \# \% # %"
+        Name = @"Value \# \% # %",
+        ProfessionalSummary = @"Summary \# \% # %"
       },
       TemplateId = "template-1",
       ResumeName = "idempotent-resume"
     };
 
     _supabaseIntegrationMock.Setup(s => s.DownloadFileAsStringAsync("template-1"))
-      .ReturnsAsync("@Model.Name");
+      .ReturnsAsync("@Model.Name|@Model.ProfessionalSummary");
     _supabaseIntegrationMock.Setup(s => s.InsertJobStatusAsync(It.IsAny<string>(), null))
       .ReturnsAsync(56);
 
@@ -289,7 +304,7 @@ public class ResumeServiceTests
     _githubIntegrationMock.Verify(g => g.PushToRepositoryAsync(
       It.IsAny<string>(),
       It.Is<string>(content =>
-        content == @"Value \# \% \# \%" &&
+        content == @"Value \# \% \# \%|Summary \# \% \# \%" &&
         !content.Contains(@"\\#") &&
         !content.Contains(@"\\%"))), Times.Once);
   }
