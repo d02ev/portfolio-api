@@ -327,7 +327,7 @@ public class ResumeService(IResumeRepository resumeRepository, IExperienceReposi
       project.ShortDescription = EscapeLatexReservedChars(project.ShortDescription);
       project.LongDescription = EscapeLatexReservedChars(project.LongDescription);
       project.RepoUrl = EscapeLatexReservedChars(project.RepoUrl);
-      project.LiveUrl = EscapeLatexReservedChars(project.LiveUrl);
+      project.LiveUrl = project.LiveUrl is not null ? EscapeLatexReservedChars(project.LiveUrl) : null;
       EscapeStringListForLatex(project.TechStack);
     }
   }
